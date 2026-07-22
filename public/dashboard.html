@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard - Soto Banjar "Nyaman"</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<nav id="navbar" class="bg-white shadow-sm sticky top-0 z-10"></nav>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800">Dashboard</h1>
+      <p class="text-gray-500 text-sm" id="todayDate"></p>
+    </div>
+    <a href="/pos.html" class="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow transition text-sm">
+      + Transaksi Baru
+    </a>
+  </div>
+
+  <div id="loadingState" class="text-center text-gray-400 py-16">Memuat data...</div>
+
+  <div id="content" class="hidden">
+
+    <!-- Row 1: Today's gross -> expenses -> net -->
+    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Ringkasan Hari Ini</p>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-amber-500">
+        <p class="text-sm text-gray-500 mb-1">Pendapatan Kotor</p>
+        <p class="text-2xl font-bold text-gray-800" id="grossToday">Rp 0</p>
+        <p class="text-xs text-gray-400 mt-1"><span id="countToday">0</span> transaksi</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-red-400">
+        <p class="text-sm text-gray-500 mb-1">Pengeluaran</p>
+        <p class="text-2xl font-bold text-gray-800" id="expensesToday">Rp 0</p>
+        <p class="text-xs text-gray-400 mt-1">Belanja, gaji, operasional, dll</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-emerald-500">
+        <p class="text-sm text-gray-500 mb-1">Pendapatan Bersih</p>
+        <p class="text-2xl font-bold" id="netToday">Rp 0</p>
+        <p class="text-xs text-gray-400 mt-1">Kotor &minus; Pengeluaran</p>
+      </div>
+    </div>
+
+    <!-- Row 2: Period totals -->
+    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pendapatan Kotor per Periode</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div class="bg-white rounded-2xl shadow p-5">
+        <p class="text-sm text-gray-500 mb-1">Minggu Ini</p>
+        <p class="text-xl font-bold text-gray-800" id="grossWeek">Rp 0</p>
+        <p class="text-xs text-gray-400 mt-1"><span id="countWeek">0</span> transaksi, sejak Senin</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow p-5">
+        <p class="text-sm text-gray-500 mb-1">Bulan Ini</p>
+        <p class="text-xl font-bold text-gray-800" id="grossMonth">Rp 0</p>
+        <p class="text-xs text-gray-400 mt-1"><span id="countMonth">0</span> transaksi</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow p-5">
+        <p class="text-sm text-gray-500 mb-1">Total Sepanjang Waktu</p>
+        <p class="text-xl font-bold text-gray-800" id="grossTotal">Rp 0</p>
+        <p class="text-xs text-gray-400 mt-1"><span id="countTotal">0</span> transaksi</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-emerald-500">
+        <p class="text-sm text-gray-500 mb-1">Pendapatan Bersih (Akumulasi)</p>
+        <p class="text-xl font-bold text-emerald-700" id="netTotal">Rp 0</p>
+        <p class="text-xs text-gray-400 mt-1">Kotor total &minus; Pengeluaran total</p>
+      </div>
+    </div>
+
+    <!-- Chart: Pemasukan Harian -->
+    <div class="bg-white rounded-2xl shadow p-5 mb-8">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="font-bold text-gray-800">📊 Grafik Pemasukan Harian</h2>
+          <p class="text-xs text-gray-400 mt-0.5">Pendapatan kotor per hari (7 hari terakhir)</p>
+        </div>
+      </div>
+      <div class="relative" style="height: 280px;">
+        <canvas id="dailyChart"></canvas>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+      <!-- Expense management -->
+      <div class="lg:col-span-3 bg-white rounded-2xl shadow overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+          <h2 class="font-bold text-gray-800">Pengeluaran Hari Ini</h2>
+          <p class="text-xs text-gray-400 mt-0.5">Belanja bahan baku, gaji karyawan, operasional, dan lainnya. Otomatis mengurangi pendapatan bersih.</p>
+        </div>
+
+        <form id="expenseForm" class="px-5 py-4 border-b border-gray-100 grid grid-cols-1 sm:grid-cols-4 gap-2">
+          <input type="text" id="expenseDesc" placeholder="Keterangan (mis. Belanja sayur)" required
+            class="sm:col-span-2 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+          <select id="expenseCategory" required class="px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white">
+            <option value="">Kategori</option>
+            <option>Belanja Harian</option>
+            <option>Gaji Karyawan</option>
+            <option>Operasional</option>
+            <option>Lainnya</option>
+          </select>
+          <input type="number" id="expenseAmount" min="1" placeholder="Jumlah (Rp)" required
+            class="px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+          <button type="submit" id="expenseSubmitBtn" class="sm:col-span-4 bg-gray-800 hover:bg-gray-900 text-white font-semibold py-2.5 rounded-lg text-sm transition">
+            + Tambah Pengeluaran
+          </button>
+          <p id="expenseFormError" class="hidden sm:col-span-4 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2"></p>
+        </form>
+
+        <div id="expenseList" class="divide-y divide-gray-100 max-h-72 overflow-y-auto"></div>
+      </div>
+
+      <!-- Payment breakdown + top items -->
+      <div class="lg:col-span-2 flex flex-col gap-6">
+        <div class="bg-white rounded-2xl shadow p-5">
+          <p class="text-sm font-bold text-gray-800 mb-3">Metode Pembayaran Hari Ini</p>
+          <div id="paymentBreakdown" class="space-y-2"></div>
+        </div>
+        <div class="bg-white rounded-2xl shadow p-5">
+          <p class="text-sm font-bold text-gray-800 mb-3">Menu Terlaris</p>
+          <div id="topItemsList" class="space-y-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent transactions -->
+    <div class="bg-white rounded-2xl shadow overflow-hidden mb-8">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="font-bold text-gray-800">Transaksi Terbaru</h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-500">
+            <tr>
+              <th class="text-left px-5 py-3 font-medium">Kode</th>
+              <th class="text-left px-5 py-3 font-medium">Waktu</th>
+              <th class="text-left px-5 py-3 font-medium">Pembayaran</th>
+              <th class="text-right px-5 py-3 font-medium">Subtotal</th>
+              <th class="text-right px-5 py-3 font-medium">Diskon</th>
+              <th class="text-right px-5 py-3 font-medium">Total</th>
+              <th class="text-left px-5 py-3 font-medium">Kasir</th>
+              <th class="text-center px-5 py-3 font-medium">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="txTableBody" class="divide-y divide-gray-100"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Rekap Transaksi Historis -->
+    <div class="bg-white rounded-2xl shadow overflow-hidden mb-8">
+      <div class="px-5 py-4 border-b border-gray-100">
+        <h2 class="font-bold text-gray-800 mb-2">📅 Rekap Transaksi Harian</h2>
+        <p class="text-xs text-gray-400 mb-3">Pilih tanggal untuk melihat rekap transaksi, pengeluaran, dan pendapatan bersih hari tersebut.</p>
+        <div class="flex items-center gap-3">
+          <input type="date" id="recapDateInput"
+            class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+          <button onclick="loadRecap()" class="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-4 py-2 rounded-lg text-sm transition">
+            Lihat Rekap
+          </button>
+        </div>
+      </div>
+
+      <div id="recapContent" class="hidden">
+        <!-- Summary cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 px-5 py-4">
+          <div class="bg-gray-50 rounded-xl p-3">
+            <p class="text-xs text-gray-500">Jumlah Transaksi</p>
+            <p class="text-lg font-bold text-gray-800" id="recapCount">0</p>
+          </div>
+          <div class="bg-gray-50 rounded-xl p-3">
+            <p class="text-xs text-gray-500">Pendapatan Kotor</p>
+            <p class="text-lg font-bold text-gray-800" id="recapGross">Rp 0</p>
+          </div>
+          <div class="bg-gray-50 rounded-xl p-3">
+            <p class="text-xs text-gray-500">Pengeluaran</p>
+            <p class="text-lg font-bold text-red-600" id="recapExpenses">Rp 0</p>
+          </div>
+          <div class="bg-gray-50 rounded-xl p-3">
+            <p class="text-xs text-gray-500">Pendapatan Bersih</p>
+            <p class="text-lg font-bold" id="recapNet">Rp 0</p>
+          </div>
+        </div>
+
+        <!-- Recap expenses -->
+        <div class="px-5 pb-2">
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pengeluaran</p>
+          <div id="recapExpenseList" class="space-y-1 mb-4"></div>
+        </div>
+
+        <!-- Recap transactions table -->
+        <div class="px-5 pb-2">
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Daftar Transaksi</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500">
+              <tr>
+                <th class="text-left px-5 py-2 font-medium">Kode</th>
+                <th class="text-left px-5 py-2 font-medium">Waktu</th>
+                <th class="text-left px-5 py-2 font-medium">Pembayaran</th>
+                <th class="text-right px-5 py-2 font-medium">Total</th>
+                <th class="text-left px-5 py-2 font-medium">Kasir</th>
+              </tr>
+            </thead>
+            <tbody id="recapTxBody" class="divide-y divide-gray-100"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="recapEmpty" class="hidden text-center text-gray-400 py-8 text-sm">
+        Tidak ada data untuk tanggal ini.
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Edit Transaction Modal -->
+<div id="editTxModal" class="hidden fixed inset-0 bg-black/50 z-30 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h3 class="font-bold text-gray-800 text-lg">Edit Transaksi</h3>
+      <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+    <div class="px-6 py-4 space-y-4">
+      <input type="hidden" id="editTxId" />
+      <p class="text-sm text-gray-500">Kode: <span id="editTxCode" class="font-semibold text-gray-700"></span></p>
+
+      <div>
+        <label class="text-sm text-gray-600 font-medium block mb-1">Item Transaksi</label>
+        <div id="editTxItems" class="space-y-2"></div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-sm text-gray-600 font-medium block mb-1">Diskon (%)</label>
+          <input type="number" id="editTxDiscount" min="0" max="100" value="0"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+        </div>
+        <div>
+          <label class="text-sm text-gray-600 font-medium block mb-1">Metode Pembayaran</label>
+          <select id="editTxPayment" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white">
+            <option value="cash">Cash</option>
+            <option value="qris">QRIS</option>
+            <option value="gojek">Gojek</option>
+            <option value="other">Lainnya</option>
+          </select>
+        </div>
+      </div>
+
+      <p id="editTxError" class="hidden text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2"></p>
+    </div>
+    <div class="px-6 py-4 border-t border-gray-100 flex gap-2">
+      <button onclick="closeEditModal()" class="flex-1 py-2.5 rounded-xl border border-gray-300 text-gray-600 font-semibold text-sm">Batal</button>
+      <button onclick="saveEditTransaction()" id="editTxSaveBtn" class="flex-1 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm transition">Simpan Perubahan</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth.js"></script>
+<script>
+  requireAuth();
+  renderNavbar("dashboard");
+
+  document.getElementById("todayDate").textContent = new Date().toLocaleDateString("id-ID", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric"
+  });
+
+  // Set default recap date to today
+  const todayISO = new Date().toISOString().slice(0, 10);
+  document.getElementById("recapDateInput").value = todayISO;
+
+  const PAYMENT_LABELS = {
+    cash: "Tunai (Cash)",
+    qris: "QRIS",
+    gojek: "GoFood / Gojek",
+    other: "Lainnya",
+  };
+
+  function paymentLabel(method) {
+    return PAYMENT_LABELS[method] || method;
+  }
+
+  let allMenuData = [];
+  let dailyChartInstance = null;
+
+  async function loadDashboard() {
+    try {
+      const [dash, txs, menuList] = await Promise.all([
+        apiFetch("/api/dashboard"),
+        apiFetch("/api/transactions"),
+        apiFetch("/api/menu"),
+      ]);
+      allMenuData = menuList;
+      renderDashboard(dash);
+      renderTransactions(txs);
+      loadDailyChart();
+      document.getElementById("loadingState").classList.add("hidden");
+      document.getElementById("content").classList.remove("hidden");
+    } catch (err) {
+      document.getElementById("loadingState").textContent = "Gagal memuat data: " + err.message;
+    }
+  }
+
+  function renderDashboard(dash) {
+    document.getElementById("grossToday").textContent = formatRupiah(dash.gross_today);
+    document.getElementById("countToday").textContent = dash.count_today;
+    document.getElementById("expensesToday").textContent = formatRupiah(dash.expenses_today);
+
+    const netTodayEl = document.getElementById("netToday");
+    netTodayEl.textContent = formatRupiah(dash.net_today);
+    netTodayEl.className = "text-2xl font-bold " + (dash.net_today < 0 ? "text-red-600" : "text-emerald-700");
+
+    document.getElementById("grossWeek").textContent = formatRupiah(dash.gross_week);
+    document.getElementById("countWeek").textContent = dash.count_week;
+    document.getElementById("grossMonth").textContent = formatRupiah(dash.gross_month);
+    document.getElementById("countMonth").textContent = dash.count_month;
+    document.getElementById("grossTotal").textContent = formatRupiah(dash.gross_total);
+    document.getElementById("countTotal").textContent = dash.count_total;
+
+    const netTotalEl = document.getElementById("netTotal");
+    netTotalEl.textContent = formatRupiah(dash.net_total);
+    netTotalEl.className = "text-xl font-bold " + (dash.net_total < 0 ? "text-red-600" : "text-emerald-700");
+
+    // Expense list
+    const listEl = document.getElementById("expenseList");
+    if (dash.expense_items_today.length === 0) {
+      listEl.innerHTML = `<p class="text-sm text-gray-400 text-center py-8">Belum ada pengeluaran tercatat hari ini.</p>`;
+    } else {
+      listEl.innerHTML = dash.expense_items_today
+        .map(
+          (exp) => `
+        <div class="flex items-center justify-between px-5 py-3">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-700 truncate">${exp.description}</p>
+            <p class="text-xs text-gray-400">${exp.category}</p>
+          </div>
+          <div class="flex items-center gap-3 flex-shrink-0">
+            <span class="text-sm font-semibold text-red-600">- ${formatRupiah(exp.amount)}</span>
+            <button onclick="deleteExpense(${exp.id})" class="text-gray-400 hover:text-red-600 text-sm">✕</button>
+          </div>
+        </div>`
+        )
+        .join("");
+    }
+
+    // Payment breakdown
+    const paymentEl = document.getElementById("paymentBreakdown");
+    if (dash.payment_breakdown_today.length === 0) {
+      paymentEl.innerHTML = `<p class="text-sm text-gray-400">Belum ada transaksi hari ini.</p>`;
+    } else {
+      paymentEl.innerHTML = dash.payment_breakdown_today
+        .map(
+          (p) => `
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-gray-600">${paymentLabel(p.payment_method)} <span class="text-gray-400">(${p.count}x)</span></span>
+          <span class="font-semibold text-gray-800">${formatRupiah(p.total)}</span>
+        </div>`
+        )
+        .join("");
+    }
+
+    // Top items
+    const topItemsList = document.getElementById("topItemsList");
+    if (dash.top_items.length === 0) {
+      topItemsList.innerHTML = `<p class="text-sm text-gray-400">Belum ada data transaksi.</p>`;
+    } else {
+      topItemsList.innerHTML = dash.top_items
+        .map(
+          (item, idx) => `
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-gray-600 truncate pr-2">${idx + 1}. ${item.menu_name}</span>
+          <span class="font-semibold text-gray-800 flex-shrink-0">${item.total_qty}x</span>
+        </div>`
+        )
+        .join("");
+    }
+  }
+
+  function renderTransactions(txs) {
+    const tbody = document.getElementById("txTableBody");
+    if (txs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" class="text-center text-gray-400 py-8">Belum ada transaksi.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = txs
+      .slice(0, 15)
+      .map(
+        (tx) => `
+      <tr class="hover:bg-gray-50">
+        <td class="px-5 py-3 font-medium text-gray-700">${tx.transaction_code}</td>
+        <td class="px-5 py-3 text-gray-500">${new Date(tx.created_at + "Z").toLocaleString("id-ID")}</td>
+        <td class="px-5 py-3 text-gray-500">${paymentLabel(tx.payment_method)}</td>
+        <td class="px-5 py-3 text-right text-gray-600">${formatRupiah(tx.subtotal)}</td>
+        <td class="px-5 py-3 text-right text-gray-600">${tx.discount_percent}% (${formatRupiah(tx.discount_amount)})</td>
+        <td class="px-5 py-3 text-right font-bold text-orange-700">${formatRupiah(tx.grand_total)}</td>
+        <td class="px-5 py-3 text-gray-500">${tx.cashier_username}</td>
+        <td class="px-5 py-3 text-center">
+          <div class="flex items-center justify-center gap-1">
+            <button onclick="openEditTransaction(${tx.id})" title="Edit" class="p-1.5 rounded-lg hover:bg-blue-50 text-blue-500 hover:text-blue-700 transition">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+            </button>
+            <button onclick="deleteTransaction(${tx.id})" title="Hapus" class="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </button>
+          </div>
+        </td>
+      </tr>`
+      )
+      .join("");
+  }
+
+  // ==================== DAILY CHART ====================
+  async function loadDailyChart() {
+    try {
+      const data = await apiFetch("/api/dashboard/daily-chart?days=7");
+      renderDailyChart(data);
+    } catch (err) {
+      console.error("Failed to load daily chart:", err);
+    }
+  }
+
+  function renderDailyChart(data) {
+    const ctx = document.getElementById("dailyChart").getContext("2d");
+    const labels = data.map((d) => {
+      const dt = new Date(d.date + "T00:00:00");
+      return dt.toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
+    });
+    const values = data.map((d) => d.total);
+
+    if (dailyChartInstance) {
+      dailyChartInstance.destroy();
+    }
+
+    dailyChartInstance = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{
+          label: "Pemasukan (Rp)",
+          data: values,
+          backgroundColor: "rgba(234, 88, 12, 0.7)",
+          borderColor: "rgba(234, 88, 12, 1)",
+          borderWidth: 1,
+          borderRadius: 6,
+          borderSkipped: false,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => "Rp " + Number(ctx.raw).toLocaleString("id-ID"),
+            },
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: (v) => "Rp " + Number(v).toLocaleString("id-ID"),
+            },
+            grid: { color: "rgba(0,0,0,0.05)" },
+          },
+          x: {
+            grid: { display: false },
+          },
+        },
+      },
+    });
+  }
+
+  // ==================== EDIT TRANSACTION ====================
+  let editTxData = null;
+
+  async function openEditTransaction(txId) {
+    try {
+      const data = await apiFetch(`/api/transactions/${txId}`);
+      editTxData = data;
+      document.getElementById("editTxId").value = data.transaction.id;
+      document.getElementById("editTxCode").textContent = data.transaction.transaction_code;
+      document.getElementById("editTxDiscount").value = data.transaction.discount_percent;
+      document.getElementById("editTxPayment").value = data.transaction.payment_method;
+      document.getElementById("editTxError").classList.add("hidden");
+
+      renderEditItems(data.items);
+      document.getElementById("editTxModal").classList.remove("hidden");
+    } catch (err) {
+      alert("Gagal memuat data transaksi: " + err.message);
+    }
+  }
+
+  function renderEditItems(items) {
+    const container = document.getElementById("editTxItems");
+    container.innerHTML = items
+      .map(
+        (item, idx) => `
+      <div class="flex items-center gap-2 bg-gray-50 rounded-lg p-2" data-idx="${idx}">
+        <select onchange="updateEditItemMenu(${idx}, this.value)" class="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+          ${allMenuData.map((m) => `<option value="${m.id}" ${m.id === item.menu_id ? "selected" : ""}>${m.name} — ${formatRupiah(m.price)}</option>`).join("")}
+        </select>
+        <input type="number" min="1" value="${item.quantity}" onchange="updateEditItemQty(${idx}, this.value)"
+          class="w-16 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center" />
+        <button onclick="removeEditItem(${idx})" class="text-red-400 hover:text-red-600 text-sm p-1">✕</button>
+      </div>`
+      )
+      .join("");
+  }
+
+  function updateEditItemMenu(idx, menuId) {
+    const menu = allMenuData.find((m) => m.id === Number(menuId));
+    if (menu) {
+      editTxData.items[idx].menu_id = menu.id;
+      editTxData.items[idx].menu_name = menu.name;
+      editTxData.items[idx].price = menu.price;
+    }
+  }
+
+  function updateEditItemQty(idx, qty) {
+    editTxData.items[idx].quantity = Math.max(1, Number(qty) || 1);
+  }
+
+  function removeEditItem(idx) {
+    editTxData.items.splice(idx, 1);
+    renderEditItems(editTxData.items);
+  }
+
+  function closeEditModal() {
+    document.getElementById("editTxModal").classList.add("hidden");
+    editTxData = null;
+  }
+
+  async function saveEditTransaction() {
+    const id = document.getElementById("editTxId").value;
+    const discount_percent = Number(document.getElementById("editTxDiscount").value) || 0;
+    const payment_method = document.getElementById("editTxPayment").value;
+    const errEl = document.getElementById("editTxError");
+    errEl.classList.add("hidden");
+
+    if (!editTxData || editTxData.items.length === 0) {
+      errEl.textContent = "Item transaksi tidak boleh kosong.";
+      errEl.classList.remove("hidden");
+      return;
+    }
+
+    const btn = document.getElementById("editTxSaveBtn");
+    btn.disabled = true;
+    btn.textContent = "Menyimpan...";
+
+    try {
+      await apiFetch(`/api/transactions/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          items: editTxData.items.map((it) => ({ menu_id: it.menu_id, quantity: it.quantity })),
+          discount_percent,
+          payment_method,
+        }),
+      });
+      closeEditModal();
+      loadDashboard();
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Simpan Perubahan";
+    }
+  }
+
+  // ==================== DELETE TRANSACTION ====================
+  async function deleteTransaction(txId) {
+    if (!confirm("Yakin ingin menghapus transaksi ini? Data tidak bisa dikembalikan.")) return;
+    try {
+      await apiFetch(`/api/transactions/${txId}`, { method: "DELETE" });
+      loadDashboard();
+    } catch (err) {
+      alert("Gagal menghapus transaksi: " + err.message);
+    }
+  }
+
+  // ==================== REKAP TRANSAKSI HISTORIS ====================
+  async function loadRecap() {
+    const date = document.getElementById("recapDateInput").value;
+    if (!date) {
+      alert("Silakan pilih tanggal terlebih dahulu.");
+      return;
+    }
+
+    try {
+      const recap = await apiFetch(`/api/transactions/recap?date=${date}`);
+
+      document.getElementById("recapCount").textContent = recap.count;
+      document.getElementById("recapGross").textContent = formatRupiah(recap.gross);
+      document.getElementById("recapExpenses").textContent = formatRupiah(recap.expenses);
+
+      const recapNetEl = document.getElementById("recapNet");
+      recapNetEl.textContent = formatRupiah(recap.net);
+      recapNetEl.className = "text-lg font-bold " + (recap.net < 0 ? "text-red-600" : "text-emerald-700");
+
+      // Expense items
+      const expListEl = document.getElementById("recapExpenseList");
+      if (recap.expense_items.length === 0) {
+        expListEl.innerHTML = `<p class="text-xs text-gray-400">Tidak ada pengeluaran.</p>`;
+      } else {
+        expListEl.innerHTML = recap.expense_items
+          .map(
+            (exp) => `
+          <div class="flex items-center justify-between text-sm bg-red-50 rounded-lg px-3 py-2">
+            <div>
+              <span class="font-medium text-gray-700">${exp.description}</span>
+              <span class="text-xs text-gray-400 ml-1">(${exp.category})</span>
+            </div>
+            <span class="font-semibold text-red-600">- ${formatRupiah(exp.amount)}</span>
+          </div>`
+          )
+          .join("");
+      }
+
+      // Transactions table
+      const recapBody = document.getElementById("recapTxBody");
+      if (recap.transactions.length === 0) {
+        recapBody.innerHTML = `<tr><td colspan="5" class="text-center text-gray-400 py-6">Tidak ada transaksi.</td></tr>`;
+      } else {
+        recapBody.innerHTML = recap.transactions
+          .map(
+            (tx) => `
+          <tr class="hover:bg-gray-50">
+            <td class="px-5 py-2 font-medium text-gray-700">${tx.transaction_code}</td>
+            <td class="px-5 py-2 text-gray-500">${new Date(tx.created_at + "Z").toLocaleString("id-ID", { timeStyle: "short" })}</td>
+            <td class="px-5 py-2 text-gray-500">${paymentLabel(tx.payment_method)}</td>
+            <td class="px-5 py-2 text-right font-bold text-orange-700">${formatRupiah(tx.grand_total)}</td>
+            <td class="px-5 py-2 text-gray-500">${tx.cashier_username}</td>
+          </tr>`
+          )
+          .join("");
+      }
+
+      // Show or hide
+      if (recap.count === 0 && recap.expense_items.length === 0) {
+        document.getElementById("recapContent").classList.add("hidden");
+        document.getElementById("recapEmpty").classList.remove("hidden");
+      } else {
+        document.getElementById("recapContent").classList.remove("hidden");
+        document.getElementById("recapEmpty").classList.add("hidden");
+      }
+    } catch (err) {
+      alert("Gagal memuat rekap: " + err.message);
+    }
+  }
+
+  // ==================== EXPENSES ====================
+  document.getElementById("expenseForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById("expenseFormError");
+    errEl.classList.add("hidden");
+
+    const description = document.getElementById("expenseDesc").value.trim();
+    const category = document.getElementById("expenseCategory").value;
+    const amount = Number(document.getElementById("expenseAmount").value);
+
+    const btn = document.getElementById("expenseSubmitBtn");
+    btn.disabled = true;
+    btn.textContent = "Menyimpan...";
+
+    try {
+      await apiFetch("/api/expenses", {
+        method: "POST",
+        body: JSON.stringify({ description, category, amount }),
+      });
+      document.getElementById("expenseForm").reset();
+      loadDashboard();
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "+ Tambah Pengeluaran";
+    }
+  });
+
+  async function deleteExpense(id) {
+    if (!confirm("Hapus data pengeluaran ini?")) return;
+    try {
+      await apiFetch(`/api/expenses/${id}`, { method: "DELETE" });
+      loadDashboard();
+    } catch (err) {
+      alert("Gagal menghapus pengeluaran: " + err.message);
+    }
+  }
+
+  loadDashboard();
+</script>
+</body>
+</html>

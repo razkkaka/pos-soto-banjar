@@ -1,0 +1,18 @@
+{
+  "name": "pos-soto-banjar-nyaman",
+  "version": "1.0.0",
+  "description": "Sistem Manajemen Kasir (POS) - Soto Banjar 'Nyaman' Antasari",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.17.4",
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "sql.js": "^1.10.3"
+  }
+}

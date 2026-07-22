@@ -1,0 +1,4 @@
+node_modules/
+data/pos.sqlite
+.env
+.vercel/
