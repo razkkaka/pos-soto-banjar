@@ -11,6 +11,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "soto-banjar-nyaman-rahasia-2026";
 
+// Initialize database immediately and store the promise
+const dbPromise = initDb().catch((err) => {
+  console.error("Gagal menginisialisasi database:", err);
+  if (!process.env.VERCEL) process.exit(1);
+});
+
 const VALID_PAYMENT_METHODS = ["cash", "qris", "gojek", "other"];
 const VALID_EXPENSE_CATEGORIES = [
   "Belanja Harian",
@@ -45,6 +51,19 @@ function firstDayOfThisMonthStr() {
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "public")));
+
+// Ensure DB is fully initialized before handling any requests
+app.use(async (req, res, next) => {
+  if (req.path.startsWith("/api/")) {
+    try {
+      await dbPromise;
+    } catch (err) {
+      console.error("DB Init Error:", err);
+      return res.status(500).json({ error: "Database initialization failed." });
+    }
+  }
+  next();
+});
 
 // ---------- Auth middleware ----------
 function authMiddleware(req, res, next) {
@@ -92,6 +111,7 @@ app.post("/api/login", async (req, res) => {
       user: { id: user.id, username: user.username, role: user.role },
     });
   } catch (err) {
+    console.error("Login error:", err);
     res.status(500).json({ error: "Terjadi kesalahan server." });
   }
 });
@@ -590,19 +610,12 @@ app.get("*", (req, res, next) => {
 });
 
 // ---------- Start ----------
-initDb()
-  .then(() => {
-    if (!process.env.VERCEL) {
-      app.listen(PORT, () => {
-        console.log(`Soto Banjar Nyaman POS berjalan di http://localhost:${PORT}`);
-      });
-    }
-  })
-  .catch((err) => {
-    console.error("Gagal menginisialisasi database:", err);
-    if (!process.env.VERCEL) {
-      process.exit(1);
-    }
+if (!process.env.VERCEL) {
+  dbPromise.then(() => {
+    app.listen(PORT, () => {
+      console.log(`Soto Banjar Nyaman POS berjalan di http://localhost:${PORT}`);
+    });
   });
+}
 
 module.exports = app;
