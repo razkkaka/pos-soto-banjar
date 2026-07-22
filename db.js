@@ -15,8 +15,8 @@ let tursoClient = null;
 function initTurso() {
   const { createClient } = require("@libsql/client");
   tursoClient = createClient({
-    url: process.env.TURSO_DATABASE_URL,
-    authToken: process.env.TURSO_AUTH_TOKEN,
+    url: process.env.TURSO_DATABASE_URL.trim(),
+    authToken: process.env.TURSO_AUTH_TOKEN ? process.env.TURSO_AUTH_TOKEN.trim() : undefined,
   });
 }
 
