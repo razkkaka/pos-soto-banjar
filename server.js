@@ -15,6 +15,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "soto-banjar-nyaman-rahasia-2026";
 const dbPromise = initDb().catch((err) => {
   console.error("Gagal menginisialisasi database:", err);
   if (!process.env.VERCEL) process.exit(1);
+  throw err;
 });
 
 const VALID_PAYMENT_METHODS = ["cash", "qris", "gojek", "other"];
