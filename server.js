@@ -592,11 +592,17 @@ app.get("*", (req, res, next) => {
 // ---------- Start ----------
 initDb()
   .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Soto Banjar Nyaman POS berjalan di http://localhost:${PORT}`);
-    });
+    if (!process.env.VERCEL) {
+      app.listen(PORT, () => {
+        console.log(`Soto Banjar Nyaman POS berjalan di http://localhost:${PORT}`);
+      });
+    }
   })
   .catch((err) => {
     console.error("Gagal menginisialisasi database:", err);
-    process.exit(1);
+    if (!process.env.VERCEL) {
+      process.exit(1);
+    }
   });
+
+module.exports = app;
