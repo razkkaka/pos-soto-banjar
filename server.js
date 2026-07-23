@@ -237,11 +237,12 @@ app.post("/api/transactions", authMiddleware, async (req, res) => {
 
     const now = new Date();
     const transactionCode = `TRX-${now.getTime()}`;
+    const createdAt = nowDatetimeStr();
 
     const transactionId = await run(
       `INSERT INTO transactions
-        (transaction_code, subtotal, discount_percent, discount_amount, grand_total, payment_method, cashier_username)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        (transaction_code, subtotal, discount_percent, discount_amount, grand_total, payment_method, cashier_username, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         transactionCode,
         subtotal,
@@ -250,6 +251,7 @@ app.post("/api/transactions", authMiddleware, async (req, res) => {
         grandTotal,
         payment_method,
         req.user.username,
+        createdAt,
       ]
     );
 
@@ -511,10 +513,11 @@ app.post("/api/expenses", authMiddleware, async (req, res) => {
     }
 
     const date = expense_date || todayStr();
+    const createdAt = nowDatetimeStr();
     const id = await run(
-      `INSERT INTO expenses (description, category, amount, expense_date, created_by)
-       VALUES (?, ?, ?, ?, ?)`,
-      [description.trim(), category, Math.round(Number(amount)), date, req.user.username]
+      `INSERT INTO expenses (description, category, amount, expense_date, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [description.trim(), category, Math.round(Number(amount)), date, req.user.username, createdAt]
     );
 
     const savedRows = await query("SELECT * FROM expenses WHERE id = ?", [id]);
@@ -562,9 +565,10 @@ app.post("/api/online_incomes", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: "Jumlah pendapatan harus valid." });
     }
     const date = income_date || todayStr();
+    const createdAt = nowDatetimeStr();
     const id = await run(
-      `INSERT INTO online_incomes (source, amount, income_date, created_by) VALUES (?, ?, ?, ?)`,
-      [source, Math.round(Number(amount)), date, req.user.username]
+      `INSERT INTO online_incomes (source, amount, income_date, created_by, created_at) VALUES (?, ?, ?, ?, ?)`,
+      [source, Math.round(Number(amount)), date, req.user.username, createdAt]
     );
     const savedRows = await query("SELECT * FROM online_incomes WHERE id = ?", [id]);
     res.status(201).json(savedRows[0]);
@@ -583,16 +587,49 @@ app.delete("/api/online_incomes/:id", authMiddleware, async (req, res) => {
   }
 });
 
+// ---------- PETTY CASH ----------
+app.get("/api/petty_cash", authMiddleware, async (req, res) => {
+  try {
+    const rows = await query(
+      "SELECT * FROM petty_cash ORDER BY created_at DESC LIMIT 1"
+    );
+    res.json({ amount: rows[0] ? rows[0].amount : 0, record: rows[0] || null });
+  } catch (err) {
+    res.status(500).json({ error: "Gagal memuat petty cash." });
+  }
+});
+
+app.post("/api/petty_cash", authMiddleware, async (req, res) => {
+  try {
+    const { amount, note } = req.body;
+    if (amount === undefined || isNaN(amount) || Number(amount) < 0) {
+      return res.status(400).json({ error: "Jumlah petty cash harus berupa angka valid (>= 0)." });
+    }
+    const createdAt = nowDatetimeStr();
+    const id = await run(
+      `INSERT INTO petty_cash (amount, note, updated_by, created_at) VALUES (?, ?, ?, ?)`,
+      [Math.round(Number(amount)), (note || "").trim(), req.user.username, createdAt]
+    );
+    const savedRows = await query("SELECT * FROM petty_cash WHERE id = ?", [id]);
+    res.status(201).json(savedRows[0]);
+  } catch (err) {
+    console.error("Petty cash error:", err);
+    res.status(500).json({ error: "Gagal menyimpan petty cash." });
+  }
+});
+
 // ---------- DASHBOARD ----------
 app.get("/api/dashboard", authMiddleware, async (req, res) => {
   try {
+    const today = todayStr();
     const monday = mondayOfThisWeekStr();
     const firstOfMonth = firstDayOfThisMonthStr();
 
     // Gross revenue (Pendapatan Kotor) — straight sum of completed transactions
     const todayGrossRows = await query(
       `SELECT COALESCE(SUM(grand_total), 0) AS total, COUNT(*) AS count
-       FROM transactions WHERE date(created_at) = date('now')`
+       FROM transactions WHERE date(created_at) = ?`,
+       [today]
     );
     const weekGrossRows = await query(
       `SELECT COALESCE(SUM(grand_total), 0) AS total, COUNT(*) AS count
@@ -610,26 +647,26 @@ app.get("/api/dashboard", authMiddleware, async (req, res) => {
     );
 
     // Online Incomes
-    const todayOnlineRows = await query(`SELECT COALESCE(SUM(amount), 0) AS total FROM online_incomes WHERE income_date = date('now')`);
+    const todayOnlineRows = await query(`SELECT COALESCE(SUM(amount), 0) AS total FROM online_incomes WHERE income_date = ?`, [today]);
     const weekOnlineRows = await query(`SELECT COALESCE(SUM(amount), 0) AS total FROM online_incomes WHERE income_date >= ?`, [monday]);
     const monthOnlineRows = await query(`SELECT COALESCE(SUM(amount), 0) AS total FROM online_incomes WHERE income_date >= ?`, [firstOfMonth]);
     const totalOnlineRows = await query(`SELECT COALESCE(SUM(amount), 0) AS total FROM online_incomes`);
-    const todayOnlineItems = await query(`SELECT * FROM online_incomes WHERE income_date = date('now') ORDER BY created_at DESC`);
+    const todayOnlineItems = await query(`SELECT * FROM online_incomes WHERE income_date = ? ORDER BY created_at DESC`, [today]);
 
     // Expenses (Pengeluaran) — belanja harian, gaji karyawan, operasional, tabungan, dll.
     const todayExpenseRows = await query(
-      `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date = date('now')`
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date = ?`, [today]
     );
     const totalExpenseRows = await query(`SELECT COALESCE(SUM(amount), 0) AS total FROM expenses`);
     const todayExpenseItems = await query(
-      `SELECT * FROM expenses WHERE expense_date = date('now') ORDER BY created_at DESC`
+      `SELECT * FROM expenses WHERE expense_date = ? ORDER BY created_at DESC`, [today]
     );
 
     // Expenses grouped by category for today
     const expensesByCategoryToday = await query(
       `SELECT category, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
-       FROM expenses WHERE expense_date = date('now')
-       GROUP BY category ORDER BY category`
+       FROM expenses WHERE expense_date = ?
+       GROUP BY category ORDER BY category`, [today]
     );
 
     // Calculate final totals
@@ -647,18 +684,24 @@ app.get("/api/dashboard", authMiddleware, async (req, res) => {
       SELECT menu_name, SUM(quantity) AS total_qty, SUM(line_total) AS total_revenue
       FROM transaction_items ti
       JOIN transactions t ON ti.transaction_id = t.id
-      WHERE date(t.created_at) = date('now')
+      WHERE date(t.created_at) = ?
       GROUP BY menu_name
       ORDER BY total_qty DESC
       LIMIT 10
-    `);
+    `, [today]);
 
     const paymentBreakdownToday = await query(`
       SELECT payment_method, COALESCE(SUM(grand_total), 0) AS total, COUNT(*) AS count
       FROM transactions
-      WHERE date(created_at) = date('now')
+      WHERE date(created_at) = ?
       GROUP BY payment_method
-    `);
+    `, [today]);
+
+    // Petty Cash (latest record)
+    const pettyCashRows = await query(
+      "SELECT * FROM petty_cash ORDER BY created_at DESC LIMIT 1"
+    );
+    const pettyCashAmount = pettyCashRows[0] ? pettyCashRows[0].amount : 0;
 
     res.json({
       gross_today: finalGrossToday,
@@ -668,6 +711,7 @@ app.get("/api/dashboard", authMiddleware, async (req, res) => {
       expenses_by_category_today: expensesByCategoryToday,
       online_income_items_today: todayOnlineItems,
       net_today: dailyNet,
+      petty_cash: pettyCashAmount,
 
       gross_week: finalGrossWeek,
       count_week: weekGrossRows[0].count,
@@ -693,20 +737,26 @@ app.get("/api/dashboard", authMiddleware, async (req, res) => {
 app.get("/api/dashboard/daily-chart", authMiddleware, async (req, res) => {
   try {
     const days = Math.min(30, Math.max(1, Number(req.query.days) || 7));
+    const today = todayStr(); // WIB-based today
+    // Compute start date
+    const startDate = new Date(`${today}T12:00:00`);
+    startDate.setDate(startDate.getDate() - (days - 1));
+    const startStr = startDate.toISOString().slice(0, 10);
+
     const rows = await query(
       `SELECT date(created_at) AS date, COALESCE(SUM(grand_total), 0) AS total
        FROM transactions
-       WHERE date(created_at) >= date('now', '-' || ? || ' days')
+       WHERE date(created_at) >= ?
        GROUP BY date(created_at)
        ORDER BY date(created_at) ASC`,
-      [days]
+      [startStr]
     );
 
     // Fill in missing dates with 0
     const result = [];
-    const today = new Date();
     for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - i));
+      const d = new Date(`${today}T12:00:00`);
+      d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().slice(0, 10);
       const found = rows.find((r) => r.date === dateStr);
       result.push({ date: dateStr, total: found ? found.total : 0 });
