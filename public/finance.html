@@ -204,29 +204,63 @@
   }
 
   // ==================== DATE PRESETS ====================
-  function todayStr() { return new Date().toISOString().slice(0, 10); }
+  function getWibParts(dateObj) {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Jakarta",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+      hour12: false,
+    });
+    const parts = {};
+    formatter.formatToParts(dateObj).forEach(p => {
+      parts[p.type] = p.value;
+    });
+    return parts;
+  }
+
+  function formatWibStr(parts) {
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  }
+
+  function todayStr() {
+    return formatWibStr(getWibParts(new Date()));
+  }
 
   function mondayStr() {
     const now = new Date();
-    const day = now.getDay();
+    const parts = getWibParts(now);
+    // JS getDay() in WIB: 
+    const wibDate = new Date(`${parts.year}-${parts.month}-${parts.day}T12:00:00`);
+    const day = wibDate.getDay();
     const diff = day === 0 ? -6 : 1 - day;
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diff);
-    return monday.toISOString().slice(0, 10);
+    wibDate.setDate(wibDate.getDate() + diff);
+    return wibDate.toISOString().slice(0, 10);
   }
 
   function firstOfMonthStr() {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const parts = getWibParts(new Date());
+    return `${parts.year}-${parts.month}-01`;
   }
 
   function lastMonthRange() {
-    const now = new Date();
-    const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const last = new Date(now.getFullYear(), now.getMonth(), 0);
+    const parts = getWibParts(new Date());
+    let year = Number(parts.year);
+    let month = Number(parts.month) - 1;
+    if (month === 0) {
+      month = 12;
+      year--;
+    }
+    
+    // First day of last month
+    const firstStr = `${year}-${String(month).padStart(2, '0')}-01`;
+    
+    // Last day of last month
+    const lastDayDate = new Date(year, month, 0); 
+    const lastStr = `${year}-${String(month).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`;
+    
     return {
-      from: first.toISOString().slice(0, 10),
-      to: last.toISOString().slice(0, 10),
+      from: firstStr,
+      to: lastStr,
     };
   }
 
