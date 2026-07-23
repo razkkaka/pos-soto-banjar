@@ -196,7 +196,7 @@
       <!-- Recent transactions -->
       <div class="bg-white rounded-2xl shadow overflow-hidden mb-8">
         <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 class="font-bold text-gray-800">Transaksi Terbaru</h2>
+          <h2 class="font-bold text-gray-800">Transaksi Terbaru (Hari Ini)</h2>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
@@ -453,7 +453,15 @@
         allMenuData = menuList;
         lastDashData = dash;
         renderDashboard(dash);
-        renderTransactions(txs);
+        
+        // Filter transactions to only show today's in "Transaksi Terbaru"
+        const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+        const todayTxs = txs.filter(tx => {
+           const txDate = new Date(tx.created_at + "Z").toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+           return txDate === todayStr;
+        });
+        renderTransactions(todayTxs);
+
         loadDailyChart();
         document.getElementById("loadingState").classList.add("hidden");
         document.getElementById("content").classList.remove("hidden");
@@ -1216,6 +1224,50 @@
         loadDashboard();
       } catch (err) {
         alert("Gagal menghapus pendapatan: " + err.message);
+      }
+    }
+
+    // ==================== PETTY CASH ====================
+    function openPettyCashEdit() {
+      document.getElementById("pettyCashError").classList.add("hidden");
+      document.getElementById("pettyCashInput").value = "";
+      document.getElementById("pettyCashNote").value = "";
+      document.getElementById("pettyCashModal").classList.remove("hidden");
+    }
+
+    function closePettyCashModal() {
+      document.getElementById("pettyCashModal").classList.add("hidden");
+    }
+
+    async function savePettyCash() {
+      const amount = document.getElementById("pettyCashInput").value;
+      const note = document.getElementById("pettyCashNote").value;
+      const errEl = document.getElementById("pettyCashError");
+      errEl.classList.add("hidden");
+
+      if (!amount || amount < 0) {
+        errEl.textContent = "Jumlah tidak valid.";
+        errEl.classList.remove("hidden");
+        return;
+      }
+
+      const btn = document.getElementById("pettyCashSaveBtn");
+      btn.disabled = true;
+      btn.textContent = "Menyimpan...";
+
+      try {
+        await apiFetch("/api/petty_cash", {
+          method: "POST",
+          body: JSON.stringify({ amount: Number(amount), note }),
+        });
+        closePettyCashModal();
+        loadDashboard();
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove("hidden");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Simpan";
       }
     }
 
