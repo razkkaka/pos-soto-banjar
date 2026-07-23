@@ -123,18 +123,31 @@
   renderNavbar("pos");
 
   let menuData = [];
-  let cart = []; // { menu_id, name, price, quantity }
+  let cart = JSON.parse(localStorage.getItem('pos_cart') || '[]');
   let activeCategory = "Semua";
   let searchQuery = "";
   let lastTransaction = null;
 
   const PAYMENT_METHODS = [
-    { value: "cash", label: "Cash" },
     { value: "qris", label: "QRIS" },
-    { value: "gojek", label: "Gojek" },
-    { value: "other", label: "Lainnya" },
+    { value: "transfer", label: "Transfer" },
+    { value: "cash", label: "Cash" },
   ];
-  let selectedPaymentMethod = "cash";
+  let selectedPaymentMethod = localStorage.getItem('pos_payment') || 'qris';
+
+  // Initialize discount from localStorage
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("discountInput").value = localStorage.getItem('pos_discount') || '0';
+  });
+
+  function saveCartState() {
+    localStorage.setItem('pos_cart', JSON.stringify(cart));
+    localStorage.setItem('pos_payment', selectedPaymentMethod);
+    const discountEl = document.getElementById("discountInput");
+    if (discountEl) {
+      localStorage.setItem('pos_discount', discountEl.value);
+    }
+  }
 
   function renderPaymentMethodButtons() {
     const el = document.getElementById("paymentMethodButtons");
@@ -154,6 +167,7 @@
 
   function setPaymentMethod(value) {
     selectedPaymentMethod = value;
+    saveCartState();
     renderPaymentMethodButtons();
   }
 
@@ -251,6 +265,9 @@
   function clearCart() {
     cart = [];
     document.getElementById("discountInput").value = 0;
+    selectedPaymentMethod = "qris";
+    saveCartState();
+    renderPaymentMethodButtons();
     renderCart();
   }
 
@@ -291,6 +308,7 @@
     document.getElementById("subtotalDisplay").textContent = formatRupiah(subtotal);
     document.getElementById("discountDisplay").textContent = "- " + formatRupiah(discountAmount);
     document.getElementById("grandTotalDisplay").textContent = formatRupiah(grandTotal);
+    saveCartState();
   }
 
   document.getElementById("discountInput").addEventListener("input", renderCart);
@@ -319,7 +337,8 @@
       showReceipt(result);
       cart = [];
       document.getElementById("discountInput").value = 0;
-      selectedPaymentMethod = "cash";
+      selectedPaymentMethod = "qris";
+      saveCartState();
       renderPaymentMethodButtons();
       renderCart();
       renderMenuGrid();
@@ -334,7 +353,9 @@
   const PAYMENT_LABELS = {
     cash: "Tunai (Cash)",
     qris: "QRIS",
+    transfer: "Transfer Bank",
     gojek: "GoFood / Gojek",
+    shopee: "ShopeeFood",
     other: "Lainnya",
   };
 
@@ -403,7 +424,12 @@
     window.print();
   }
 
+  // Set initial discount after elements exist but before renderCart is called explicitly
+  document.getElementById("discountInput").value = localStorage.getItem('pos_discount') || '0';
+  
   loadMenu();
+  // Call renderCart initially to load the saved cart state visually
+  renderCart();
 </script>
 </body>
 </html>

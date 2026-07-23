@@ -85,32 +85,61 @@
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
-      <!-- Expense management -->
-      <div class="lg:col-span-3 bg-white rounded-2xl shadow overflow-hidden">
-        <div class="px-5 py-4 border-b border-gray-100">
-          <h2 class="font-bold text-gray-800">Pengeluaran Hari Ini</h2>
-          <p class="text-xs text-gray-400 mt-0.5">Belanja bahan baku, gaji karyawan, operasional, dan lainnya. Otomatis mengurangi pendapatan bersih.</p>
+      <!-- Left Column: Expenses & Online Incomes -->
+      <div class="lg:col-span-3 flex flex-col gap-6">
+        
+        <!-- Expense management -->
+        <div class="bg-white rounded-2xl shadow overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-100">
+            <h2 class="font-bold text-gray-800">Pengeluaran Hari Ini</h2>
+            <p class="text-xs text-gray-400 mt-0.5">Belanja bahan baku, gaji karyawan, operasional, dan lainnya. Otomatis mengurangi pendapatan bersih.</p>
+          </div>
+
+          <form id="expenseForm" class="px-5 py-4 border-b border-gray-100 grid grid-cols-1 sm:grid-cols-4 gap-2">
+            <input type="text" id="expenseDesc" placeholder="Keterangan (mis. Belanja sayur)" required
+              class="sm:col-span-2 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+            <select id="expenseCategory" required class="px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white">
+              <option value="">Kategori</option>
+              <option>Belanja Harian</option>
+              <option>Gaji Karyawan</option>
+              <option>Operasional</option>
+              <option>Lainnya</option>
+            </select>
+            <input type="number" id="expenseAmount" min="1" placeholder="Jumlah (Rp)" required
+              class="px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+            <button type="submit" id="expenseSubmitBtn" class="sm:col-span-4 bg-gray-800 hover:bg-gray-900 text-white font-semibold py-2.5 rounded-lg text-sm transition">
+              + Tambah Pengeluaran
+            </button>
+            <p id="expenseFormError" class="hidden sm:col-span-4 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2"></p>
+          </form>
+
+          <div id="expenseList" class="divide-y divide-gray-100 max-h-72 overflow-y-auto"></div>
         </div>
 
-        <form id="expenseForm" class="px-5 py-4 border-b border-gray-100 grid grid-cols-1 sm:grid-cols-4 gap-2">
-          <input type="text" id="expenseDesc" placeholder="Keterangan (mis. Belanja sayur)" required
-            class="sm:col-span-2 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
-          <select id="expenseCategory" required class="px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white">
-            <option value="">Kategori</option>
-            <option>Belanja Harian</option>
-            <option>Gaji Karyawan</option>
-            <option>Operasional</option>
-            <option>Lainnya</option>
-          </select>
-          <input type="number" id="expenseAmount" min="1" placeholder="Jumlah (Rp)" required
-            class="px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
-          <button type="submit" id="expenseSubmitBtn" class="sm:col-span-4 bg-gray-800 hover:bg-gray-900 text-white font-semibold py-2.5 rounded-lg text-sm transition">
-            + Tambah Pengeluaran
-          </button>
-          <p id="expenseFormError" class="hidden sm:col-span-4 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2"></p>
-        </form>
+        <!-- Online Income management -->
+        <div class="bg-white rounded-2xl shadow overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-100">
+            <h2 class="font-bold text-gray-800">Pendapatan Online Manual</h2>
+            <p class="text-xs text-gray-400 mt-0.5">Input pendapatan dari ShopeeFood atau GoFood. Otomatis menambah pendapatan kotor.</p>
+          </div>
 
-        <div id="expenseList" class="divide-y divide-gray-100 max-h-72 overflow-y-auto"></div>
+          <form id="onlineIncomeForm" class="px-5 py-4 border-b border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <select id="onlineSource" required class="px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white">
+              <option value="">Pilih Sumber</option>
+              <option value="gojek">Gojek</option>
+              <option value="shopee">Shopee</option>
+            </select>
+            <input type="number" id="onlineAmount" min="1" placeholder="Jumlah (Rp)" required
+              class="px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+            <button type="submit" id="onlineSubmitBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg text-sm transition">
+              + Tambah Pendapatan
+            </button>
+            <p id="onlineFormError" class="hidden sm:col-span-3 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2"></p>
+          </form>
+
+          <div id="onlineIncomeList" class="divide-y divide-gray-100 max-h-72 overflow-y-auto"></div>
+        </div>
+
       </div>
 
       <!-- Payment breakdown + top items -->
@@ -191,6 +220,12 @@
           <div id="recapExpenseList" class="space-y-1 mb-4"></div>
         </div>
 
+        <!-- Recap online incomes -->
+        <div class="px-5 pb-2">
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pendapatan Online Manual</p>
+          <div id="recapOnlineList" class="space-y-1 mb-4"></div>
+        </div>
+
         <!-- Recap transactions table -->
         <div class="px-5 pb-2">
           <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Daftar Transaksi</p>
@@ -246,7 +281,9 @@
           <select id="editTxPayment" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white">
             <option value="cash">Cash</option>
             <option value="qris">QRIS</option>
+            <option value="transfer">Transfer</option>
             <option value="gojek">Gojek</option>
+            <option value="shopee">Shopee</option>
             <option value="other">Lainnya</option>
           </select>
         </div>
@@ -277,7 +314,9 @@
   const PAYMENT_LABELS = {
     cash: "Tunai (Cash)",
     qris: "QRIS",
+    transfer: "Transfer Bank",
     gojek: "GoFood / Gojek",
+    shopee: "ShopeeFood",
     other: "Lainnya",
   };
 
@@ -342,6 +381,27 @@
           <div class="flex items-center gap-3 flex-shrink-0">
             <span class="text-sm font-semibold text-red-600">- ${formatRupiah(exp.amount)}</span>
             <button onclick="deleteExpense(${exp.id})" class="text-gray-400 hover:text-red-600 text-sm">✕</button>
+          </div>
+        </div>`
+        )
+        .join("");
+    }
+
+    // Online Incomes List
+    const onlineListEl = document.getElementById("onlineIncomeList");
+    if (dash.online_income_items_today.length === 0) {
+      onlineListEl.innerHTML = `<p class="text-sm text-gray-400 text-center py-8">Belum ada pendapatan manual hari ini.</p>`;
+    } else {
+      onlineListEl.innerHTML = dash.online_income_items_today
+        .map(
+          (item) => `
+        <div class="flex items-center justify-between px-5 py-3">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-700 truncate capitalize">${item.source}</p>
+          </div>
+          <div class="flex items-center gap-3 flex-shrink-0">
+            <span class="text-sm font-semibold text-emerald-600">+ ${formatRupiah(item.amount)}</span>
+            <button onclick="deleteOnlineIncome(${item.id})" class="text-gray-400 hover:text-red-600 text-sm">✕</button>
           </div>
         </div>`
         )
@@ -623,6 +683,22 @@
           .join("");
       }
 
+      // Online Income items
+      const onlineListEl = document.getElementById("recapOnlineList");
+      if (recap.online_income_items.length === 0) {
+        onlineListEl.innerHTML = `<p class="text-xs text-gray-400">Tidak ada pendapatan manual.</p>`;
+      } else {
+        onlineListEl.innerHTML = recap.online_income_items
+          .map(
+            (inc) => `
+          <div class="flex items-center justify-between text-sm bg-emerald-50 rounded-lg px-3 py-2">
+            <span class="font-medium text-gray-700 capitalize">${inc.source}</span>
+            <span class="font-semibold text-emerald-600">+ ${formatRupiah(inc.amount)}</span>
+          </div>`
+          )
+          .join("");
+      }
+
       // Transactions table
       const recapBody = document.getElementById("recapTxBody");
       if (recap.transactions.length === 0) {
@@ -643,7 +719,7 @@
       }
 
       // Show or hide
-      if (recap.count === 0 && recap.expense_items.length === 0) {
+      if (recap.count === 0 && recap.expense_items.length === 0 && recap.online_income_items.length === 0) {
         document.getElementById("recapContent").classList.add("hidden");
         document.getElementById("recapEmpty").classList.remove("hidden");
       } else {
@@ -692,6 +768,45 @@
       loadDashboard();
     } catch (err) {
       alert("Gagal menghapus pengeluaran: " + err.message);
+    }
+  }
+
+  // ==================== ONLINE INCOMES ====================
+  document.getElementById("onlineIncomeForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById("onlineFormError");
+    errEl.classList.add("hidden");
+
+    const source = document.getElementById("onlineSource").value;
+    const amount = Number(document.getElementById("onlineAmount").value);
+
+    const btn = document.getElementById("onlineSubmitBtn");
+    btn.disabled = true;
+    btn.textContent = "Menyimpan...";
+
+    try {
+      await apiFetch("/api/online_incomes", {
+        method: "POST",
+        body: JSON.stringify({ source, amount }),
+      });
+      document.getElementById("onlineIncomeForm").reset();
+      loadDashboard();
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "+ Tambah Pendapatan";
+    }
+  });
+
+  async function deleteOnlineIncome(id) {
+    if (!confirm("Hapus pendapatan online ini?")) return;
+    try {
+      await apiFetch(`/api/online_incomes/${id}`, { method: "DELETE" });
+      loadDashboard();
+    } catch (err) {
+      alert("Gagal menghapus pendapatan: " + err.message);
     }
   }
 

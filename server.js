@@ -18,7 +18,7 @@ const dbPromise = initDb().catch((err) => {
   throw err;
 });
 
-const VALID_PAYMENT_METHODS = ["cash", "qris", "gojek", "other"];
+const VALID_PAYMENT_METHODS = ["cash", "qris", "transfer", "gojek", "shopee", "other"];
 const VALID_EXPENSE_CATEGORIES = [
   "Belanja Harian",
   "Gaji Karyawan",
@@ -311,14 +311,27 @@ app.get("/api/transactions/recap", authMiddleware, async (req, res) => {
       [date]
     );
 
+    const onlineIncomeRows = await query(
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM online_incomes WHERE income_date = ?`,
+      [date]
+    );
+
+    const onlineIncomeItems = await query(
+      `SELECT * FROM online_incomes WHERE income_date = ? ORDER BY created_at DESC`,
+      [date]
+    );
+
+    const finalGross = summaryRows[0].gross + onlineIncomeRows[0].total;
+
     res.json({
       date,
-      gross: summaryRows[0].gross,
+      gross: finalGross,
       count: summaryRows[0].count,
       expenses: expenseRows[0].total,
-      net: summaryRows[0].gross - expenseRows[0].total,
+      net: finalGross - expenseRows[0].total,
       transactions: txRows,
       expense_items: expenseItems,
+      online_income_items: onlineIncomeItems,
     });
   } catch (err) {
     console.error("Recap error:", err);
@@ -493,6 +506,51 @@ app.delete("/api/expenses/:id", authMiddleware, async (req, res) => {
   }
 });
 
+// ---------- ONLINE INCOMES (Gojek / Shopee) ----------
+app.get("/api/online_incomes", authMiddleware, async (req, res) => {
+  try {
+    const date = req.query.date || todayStr();
+    const rows = await query(
+      "SELECT * FROM online_incomes WHERE income_date = ? ORDER BY created_at DESC",
+      [date]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: "Gagal memuat pendapatan online." });
+  }
+});
+
+app.post("/api/online_incomes", authMiddleware, async (req, res) => {
+  try {
+    const { source, amount, income_date } = req.body;
+    if (!source || !["gojek", "shopee"].includes(source)) {
+      return res.status(400).json({ error: "Sumber harus gojek atau shopee." });
+    }
+    if (amount === undefined || isNaN(amount) || Number(amount) <= 0) {
+      return res.status(400).json({ error: "Jumlah pendapatan harus valid." });
+    }
+    const date = income_date || todayStr();
+    const id = await run(
+      `INSERT INTO online_incomes (source, amount, income_date, created_by) VALUES (?, ?, ?, ?)`,
+      [source, Math.round(Number(amount)), date, req.user.username]
+    );
+    const savedRows = await query("SELECT * FROM online_incomes WHERE id = ?", [id]);
+    res.status(201).json(savedRows[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Gagal menambah pendapatan online." });
+  }
+});
+
+app.delete("/api/online_incomes/:id", authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await run("DELETE FROM online_incomes WHERE id = ?", [id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Gagal menghapus pendapatan online." });
+  }
+});
+
 // ---------- DASHBOARD ----------
 app.get("/api/dashboard", authMiddleware, async (req, res) => {
   try {
@@ -519,6 +577,13 @@ app.get("/api/dashboard", authMiddleware, async (req, res) => {
        FROM transactions`
     );
 
+    // Online Incomes
+    const todayOnlineRows = await query(`SELECT COALESCE(SUM(amount), 0) AS total FROM online_incomes WHERE income_date = date('now')`);
+    const weekOnlineRows = await query(`SELECT COALESCE(SUM(amount), 0) AS total FROM online_incomes WHERE income_date >= ?`, [monday]);
+    const monthOnlineRows = await query(`SELECT COALESCE(SUM(amount), 0) AS total FROM online_incomes WHERE income_date >= ?`, [firstOfMonth]);
+    const totalOnlineRows = await query(`SELECT COALESCE(SUM(amount), 0) AS total FROM online_incomes`);
+    const todayOnlineItems = await query(`SELECT * FROM online_incomes WHERE income_date = date('now') ORDER BY created_at DESC`);
+
     // Expenses (Pengeluaran) — belanja harian, gaji karyawan, operasional, dll.
     const todayExpenseRows = await query(
       `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date = date('now')`
@@ -528,9 +593,15 @@ app.get("/api/dashboard", authMiddleware, async (req, res) => {
       `SELECT * FROM expenses WHERE expense_date = date('now') ORDER BY created_at DESC`
     );
 
+    // Calculate final totals
+    const finalGrossToday = todayGrossRows[0].total + todayOnlineRows[0].total;
+    const finalGrossWeek = weekGrossRows[0].total + weekOnlineRows[0].total;
+    const finalGrossMonth = monthGrossRows[0].total + monthOnlineRows[0].total;
+    const finalGrossTotal = totalGrossRows[0].total + totalOnlineRows[0].total;
+
     // Net revenue (Pendapatan Bersih) = gross - expenses.
-    const dailyNet = todayGrossRows[0].total - todayExpenseRows[0].total;
-    const totalNet = totalGrossRows[0].total - totalExpenseRows[0].total;
+    const dailyNet = finalGrossToday - todayExpenseRows[0].total;
+    const totalNet = finalGrossTotal - totalExpenseRows[0].total;
 
     const topItems = await query(`
       SELECT menu_name, SUM(quantity) AS total_qty, SUM(line_total) AS total_revenue
@@ -548,19 +619,20 @@ app.get("/api/dashboard", authMiddleware, async (req, res) => {
     `);
 
     res.json({
-      gross_today: todayGrossRows[0].total,
+      gross_today: finalGrossToday,
       count_today: todayGrossRows[0].count,
       expenses_today: todayExpenseRows[0].total,
       expense_items_today: todayExpenseItems,
+      online_income_items_today: todayOnlineItems,
       net_today: dailyNet,
 
-      gross_week: weekGrossRows[0].total,
+      gross_week: finalGrossWeek,
       count_week: weekGrossRows[0].count,
 
-      gross_month: monthGrossRows[0].total,
+      gross_month: finalGrossMonth,
       count_month: monthGrossRows[0].count,
 
-      gross_total: totalGrossRows[0].total,
+      gross_total: finalGrossTotal,
       count_total: totalGrossRows[0].count,
       expenses_total: totalExpenseRows[0].total,
       net_total: totalNet,

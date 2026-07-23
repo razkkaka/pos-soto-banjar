@@ -137,6 +137,14 @@ const CREATE_TABLES_SQL = [
     created_by TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   )`,
+  `CREATE TABLE IF NOT EXISTS online_incomes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    income_date TEXT NOT NULL,
+    created_by TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`,
 ];
 
 // ============================================================
@@ -242,6 +250,22 @@ function migrate() {
         category TEXT NOT NULL,
         amount INTEGER NOT NULL,
         expense_date TEXT NOT NULL,
+        created_by TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+    `);
+  }
+
+  const onlineIncomesTable = localQuery(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='online_incomes'"
+  );
+  if (onlineIncomesTable.length === 0) {
+    db.run(`
+      CREATE TABLE online_incomes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        income_date TEXT NOT NULL,
         created_by TEXT,
         created_at TEXT DEFAULT (datetime('now'))
       );
