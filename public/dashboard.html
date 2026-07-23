@@ -31,7 +31,7 @@
 
       <!-- Row 1: Today's gross -> expenses -> net -->
       <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Ringkasan Hari Ini</p>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-amber-500">
           <p class="text-sm text-gray-500 mb-1">Pendapatan Kotor</p>
           <p class="text-2xl font-bold text-gray-800" id="grossToday">Rp 0</p>
@@ -46,6 +46,15 @@
           <p class="text-sm text-gray-500 mb-1">Pendapatan Bersih</p>
           <p class="text-2xl font-bold" id="netToday">Rp 0</p>
           <p class="text-xs text-gray-400 mt-1">Kotor &minus; Pengeluaran</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-violet-500">
+          <p class="text-sm text-gray-500 mb-1">Petty Cash</p>
+          <div class="flex items-center gap-2">
+            <p class="text-2xl font-bold text-violet-700" id="pettyCashAmount">Rp 0</p>
+          </div>
+          <div class="mt-2">
+            <button onclick="openPettyCashEdit()" class="text-xs text-violet-600 hover:text-violet-800 font-semibold underline transition">✏️ Ubah Nominal</button>
+          </div>
         </div>
       </div>
 
@@ -362,6 +371,33 @@
   <div id="copyToast"
     class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-sm px-5 py-2.5 rounded-xl shadow-lg transition-all duration-300 opacity-0 pointer-events-none z-50">
     ✅ Berhasil disalin ke clipboard!
+  </div>
+
+  <!-- Petty Cash Edit Modal -->
+  <div id="pettyCashModal" class="hidden fixed inset-0 bg-black/50 z-30 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-bold text-gray-800 text-lg">💰 Ubah Petty Cash</h3>
+        <button onclick="closePettyCashModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      </div>
+      <div class="px-6 py-4 space-y-4">
+        <div>
+          <label class="text-sm text-gray-600 font-medium block mb-1">Jumlah (Rp)</label>
+          <input type="number" id="pettyCashInput" min="0" placeholder="Masukkan jumlah petty cash"
+            class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none" />
+        </div>
+        <div>
+          <label class="text-sm text-gray-600 font-medium block mb-1">Catatan (opsional)</label>
+          <input type="text" id="pettyCashNote" placeholder="Mis. Kas kecil harian"
+            class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none" />
+        </div>
+        <p id="pettyCashError" class="hidden text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2"></p>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-100 flex gap-2">
+        <button onclick="closePettyCashModal()" class="flex-1 py-2.5 rounded-xl border border-gray-300 text-gray-600 font-semibold text-sm">Batal</button>
+        <button onclick="savePettyCash()" id="pettyCashSaveBtn" class="flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm transition">Simpan</button>
+      </div>
+    </div>
   </div>
 
   <script src="/js/auth.js"></script>
