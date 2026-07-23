@@ -37,7 +37,7 @@
       <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-red-400">
         <p class="text-sm text-gray-500 mb-1">Pengeluaran</p>
         <p class="text-2xl font-bold text-gray-800" id="expensesToday">Rp 0</p>
-        <p class="text-xs text-gray-400 mt-1">Belanja, gaji, operasional, dll</p>
+        <p class="text-xs text-gray-400 mt-1">Belanja, gaji, operasional, tabungan, dll</p>
       </div>
       <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-emerald-500">
         <p class="text-sm text-gray-500 mb-1">Pendapatan Bersih</p>
@@ -92,7 +92,7 @@
         <div class="bg-white rounded-2xl shadow overflow-hidden">
           <div class="px-5 py-4 border-b border-gray-100">
             <h2 class="font-bold text-gray-800">Pengeluaran Hari Ini</h2>
-            <p class="text-xs text-gray-400 mt-0.5">Belanja bahan baku, gaji karyawan, operasional, dan lainnya. Otomatis mengurangi pendapatan bersih.</p>
+            <p class="text-xs text-gray-400 mt-0.5">Belanja bahan baku, gaji karyawan, operasional, tabungan, dan lainnya. Otomatis mengurangi pendapatan bersih.</p>
           </div>
 
           <form id="expenseForm" class="px-5 py-4 border-b border-gray-100 grid grid-cols-1 sm:grid-cols-4 gap-2">
@@ -103,6 +103,7 @@
               <option>Belanja Harian</option>
               <option>Gaji Karyawan</option>
               <option>Operasional</option>
+              <option>Tabungan</option>
               <option>Lainnya</option>
             </select>
             <input type="number" id="expenseAmount" min="1" placeholder="Jumlah (Rp)" required
@@ -114,6 +115,19 @@
           </form>
 
           <div id="expenseList" class="divide-y divide-gray-100 max-h-72 overflow-y-auto"></div>
+
+          <!-- Category Summary -->
+          <div id="expenseCategorySummary" class="hidden border-t border-gray-200 bg-gray-50 px-5 py-4"></div>
+
+          <!-- Copy/Export buttons -->
+          <div id="expenseActions" class="hidden border-t border-gray-200 px-5 py-3 flex gap-2">
+            <button onclick="copyExpensesToday()" class="flex-1 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 transition">
+              📋 Copy Catatan
+            </button>
+            <button onclick="downloadExpensesCsvToday()" class="flex-1 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 transition">
+              📥 Download Excel
+            </button>
+          </div>
         </div>
 
         <!-- Online Income management -->
@@ -142,15 +156,15 @@
 
       </div>
 
-      <!-- Payment breakdown + top items -->
+      <!-- Payment breakdown (now includes online incomes) -->
       <div class="lg:col-span-2 flex flex-col gap-6">
         <div class="bg-white rounded-2xl shadow p-5">
           <p class="text-sm font-bold text-gray-800 mb-3">Metode Pembayaran Hari Ini</p>
           <div id="paymentBreakdown" class="space-y-2"></div>
-        </div>
-        <div class="bg-white rounded-2xl shadow p-5">
-          <p class="text-sm font-bold text-gray-800 mb-3">Menu Terlaris</p>
-          <div id="topItemsList" class="space-y-2"></div>
+          <div id="paymentTotal" class="hidden mt-3 pt-3 border-t border-gray-200 flex items-center justify-between text-sm">
+            <span class="font-bold text-gray-700">Total</span>
+            <span class="font-bold text-gray-800" id="paymentTotalAmount">Rp 0</span>
+          </div>
         </div>
       </div>
     </div>
@@ -214,16 +228,29 @@
           </div>
         </div>
 
-        <!-- Recap expenses -->
+        <!-- Recap Metode Pembayaran -->
         <div class="px-5 pb-2">
-          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pengeluaran</p>
-          <div id="recapExpenseList" class="space-y-1 mb-4"></div>
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Metode Pembayaran</p>
+          <div id="recapPaymentBreakdown" class="space-y-1 mb-4"></div>
+        </div>
+
+        <!-- Recap expenses by category -->
+        <div class="px-5 pb-2">
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pengeluaran per Kategori</p>
+          <div id="recapExpenseCategoryList" class="space-y-1 mb-2"></div>
+          <div id="recapExpenseItemsList" class="space-y-1 mb-4"></div>
         </div>
 
         <!-- Recap online incomes -->
         <div class="px-5 pb-2">
           <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pendapatan Online Manual</p>
           <div id="recapOnlineList" class="space-y-1 mb-4"></div>
+        </div>
+
+        <!-- Recap Menu Terlaris -->
+        <div class="px-5 pb-2">
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">🏆 Menu Terlaris Hari Itu</p>
+          <div id="recapTopItems" class="space-y-1 mb-4"></div>
         </div>
 
         <!-- Recap transactions table -->
@@ -243,6 +270,16 @@
             </thead>
             <tbody id="recapTxBody" class="divide-y divide-gray-100"></tbody>
           </table>
+        </div>
+
+        <!-- Recap Copy/Export -->
+        <div class="px-5 py-3 border-t border-gray-200 flex gap-2">
+          <button onclick="copyRecap()" class="flex-1 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 transition">
+            📋 Copy Rekap
+          </button>
+          <button onclick="downloadRecapCsv()" class="flex-1 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 transition">
+            📥 Download Excel
+          </button>
         </div>
       </div>
 
@@ -298,6 +335,11 @@
   </div>
 </div>
 
+<!-- Copy success toast -->
+<div id="copyToast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-sm px-5 py-2.5 rounded-xl shadow-lg transition-all duration-300 opacity-0 pointer-events-none z-50">
+  ✅ Berhasil disalin ke clipboard!
+</div>
+
 <script src="/js/auth.js"></script>
 <script>
   requireAuth();
@@ -326,6 +368,20 @@
 
   let allMenuData = [];
   let dailyChartInstance = null;
+  let lastDashData = null;
+  let lastRecapData = null;
+
+  // ==================== TOAST ====================
+  function showToast(msg) {
+    const toast = document.getElementById("copyToast");
+    toast.textContent = msg || "✅ Berhasil disalin ke clipboard!";
+    toast.classList.remove("opacity-0", "pointer-events-none");
+    toast.classList.add("opacity-100");
+    setTimeout(() => {
+      toast.classList.remove("opacity-100");
+      toast.classList.add("opacity-0", "pointer-events-none");
+    }, 2000);
+  }
 
   async function loadDashboard() {
     try {
@@ -335,6 +391,7 @@
         apiFetch("/api/menu"),
       ]);
       allMenuData = menuList;
+      lastDashData = dash;
       renderDashboard(dash);
       renderTransactions(txs);
       loadDailyChart();
@@ -387,6 +444,33 @@
         .join("");
     }
 
+    // Expense category summary
+    const categorySummaryEl = document.getElementById("expenseCategorySummary");
+    const expenseActionsEl = document.getElementById("expenseActions");
+    if (dash.expenses_by_category_today && dash.expenses_by_category_today.length > 0) {
+      categorySummaryEl.classList.remove("hidden");
+      expenseActionsEl.classList.remove("hidden");
+      let summaryHtml = `<p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Ringkasan per Kategori</p>`;
+      summaryHtml += `<div class="space-y-1.5">`;
+      dash.expenses_by_category_today.forEach((cat) => {
+        summaryHtml += `
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-600">${cat.category} <span class="text-gray-400 text-xs">(${cat.count} item)</span></span>
+            <span class="font-semibold text-red-600">${formatRupiah(cat.total)}</span>
+          </div>`;
+      });
+      summaryHtml += `</div>`;
+      summaryHtml += `
+        <div class="mt-3 pt-3 border-t border-gray-300 flex items-center justify-between">
+          <span class="text-sm font-bold text-gray-700">Grand Total Pengeluaran</span>
+          <span class="text-sm font-bold text-red-700">${formatRupiah(dash.expenses_today)}</span>
+        </div>`;
+      categorySummaryEl.innerHTML = summaryHtml;
+    } else {
+      categorySummaryEl.classList.add("hidden");
+      expenseActionsEl.classList.add("hidden");
+    }
+
     // Online Incomes List
     const onlineListEl = document.getElementById("onlineIncomeList");
     if (dash.online_income_items_today.length === 0) {
@@ -408,36 +492,55 @@
         .join("");
     }
 
-    // Payment breakdown
+    // Payment breakdown — merged with online incomes
+    renderPaymentBreakdown(dash.payment_breakdown_today, dash.online_income_items_today);
+  }
+
+  // ==================== PAYMENT BREAKDOWN (merged with online incomes) ====================
+  function renderPaymentBreakdown(paymentData, onlineItems) {
     const paymentEl = document.getElementById("paymentBreakdown");
-    if (dash.payment_breakdown_today.length === 0) {
-      paymentEl.innerHTML = `<p class="text-sm text-gray-400">Belum ada transaksi hari ini.</p>`;
-    } else {
-      paymentEl.innerHTML = dash.payment_breakdown_today
-        .map(
-          (p) => `
-        <div class="flex items-center justify-between text-sm">
-          <span class="text-gray-600">${paymentLabel(p.payment_method)} <span class="text-gray-400">(${p.count}x)</span></span>
-          <span class="font-semibold text-gray-800">${formatRupiah(p.total)}</span>
-        </div>`
-        )
-        .join("");
+    const paymentTotalEl = document.getElementById("paymentTotal");
+    const paymentTotalAmountEl = document.getElementById("paymentTotalAmount");
+
+    // Build a map of payment method -> {total, count}
+    const merged = {};
+    if (paymentData) {
+      paymentData.forEach((p) => {
+        merged[p.payment_method] = { total: p.total, count: p.count };
+      });
     }
 
-    // Top items
-    const topItemsList = document.getElementById("topItemsList");
-    if (dash.top_items.length === 0) {
-      topItemsList.innerHTML = `<p class="text-sm text-gray-400">Belum ada data transaksi.</p>`;
+    // Add online incomes into the merged map
+    if (onlineItems) {
+      onlineItems.forEach((item) => {
+        const key = item.source; // 'gojek' or 'shopee'
+        if (!merged[key]) {
+          merged[key] = { total: 0, count: 0 };
+        }
+        merged[key].total += item.amount;
+        merged[key].count += 1;
+      });
+    }
+
+    const keys = Object.keys(merged);
+    if (keys.length === 0) {
+      paymentEl.innerHTML = `<p class="text-sm text-gray-400">Belum ada transaksi hari ini.</p>`;
+      paymentTotalEl.classList.add("hidden");
     } else {
-      topItemsList.innerHTML = dash.top_items
-        .map(
-          (item, idx) => `
-        <div class="flex items-center justify-between text-sm">
-          <span class="text-gray-600 truncate pr-2">${idx + 1}. ${item.menu_name}</span>
-          <span class="font-semibold text-gray-800 flex-shrink-0">${item.total_qty}x</span>
-        </div>`
-        )
+      let grandTotal = 0;
+      paymentEl.innerHTML = keys
+        .map((method) => {
+          const p = merged[method];
+          grandTotal += p.total;
+          return `
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-600">${paymentLabel(method)} <span class="text-gray-400">(${p.count}x)</span></span>
+            <span class="font-semibold text-gray-800">${formatRupiah(p.total)}</span>
+          </div>`;
+        })
         .join("");
+      paymentTotalAmountEl.textContent = formatRupiah(grandTotal);
+      paymentTotalEl.classList.remove("hidden");
     }
   }
 
@@ -535,6 +638,76 @@
         },
       },
     });
+  }
+
+  // ==================== COPY / EXPORT EXPENSES TODAY ====================
+  function buildExpenseTextToday() {
+    if (!lastDashData) return "";
+    const dash = lastDashData;
+    const dateStr = new Date().toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    let text = `PENGELUARAN HARI INI\n${dateStr}\n${"=".repeat(40)}\n\n`;
+
+    if (dash.expense_items_today.length === 0) {
+      text += "Belum ada pengeluaran.\n";
+      return text;
+    }
+
+    // Group by category
+    const grouped = {};
+    dash.expense_items_today.forEach((exp) => {
+      if (!grouped[exp.category]) grouped[exp.category] = [];
+      grouped[exp.category].push(exp);
+    });
+
+    for (const [cat, items] of Object.entries(grouped)) {
+      const catTotal = items.reduce((s, e) => s + e.amount, 0);
+      text += `📁 ${cat}\n`;
+      items.forEach((exp) => {
+        text += `   • ${exp.description}: ${formatRupiah(exp.amount)}\n`;
+      });
+      text += `   Subtotal: ${formatRupiah(catTotal)}\n\n`;
+    }
+
+    text += `${"─".repeat(40)}\n`;
+    text += `GRAND TOTAL: ${formatRupiah(dash.expenses_today)}\n`;
+    return text;
+  }
+
+  function copyExpensesToday() {
+    const text = buildExpenseTextToday();
+    navigator.clipboard.writeText(text).then(() => showToast("✅ Catatan pengeluaran disalin!"));
+  }
+
+  function downloadExpensesCsvToday() {
+    if (!lastDashData) return;
+    const dash = lastDashData;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    let csv = "Tanggal,Kategori,Keterangan,Jumlah\n";
+    dash.expense_items_today.forEach((exp) => {
+      csv += `${dateStr},"${exp.category}","${exp.description}",${exp.amount}\n`;
+    });
+    // Add category totals
+    csv += "\nRingkasan per Kategori\n";
+    csv += "Kategori,Total\n";
+    if (dash.expenses_by_category_today) {
+      dash.expenses_by_category_today.forEach((cat) => {
+        csv += `"${cat.category}",${cat.total}\n`;
+      });
+    }
+    csv += `\nGrand Total,${dash.expenses_today}\n`;
+
+    downloadCsv(csv, `pengeluaran_${dateStr}.csv`);
+  }
+
+  function downloadCsv(content, filename) {
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // ==================== EDIT TRANSACTION ====================
@@ -655,6 +828,7 @@
 
     try {
       const recap = await apiFetch(`/api/transactions/recap?date=${date}`);
+      lastRecapData = recap;
 
       document.getElementById("recapCount").textContent = recap.count;
       document.getElementById("recapGross").textContent = formatRupiah(recap.gross);
@@ -664,23 +838,70 @@
       recapNetEl.textContent = formatRupiah(recap.net);
       recapNetEl.className = "text-lg font-bold " + (recap.net < 0 ? "text-red-600" : "text-emerald-700");
 
-      // Expense items
-      const expListEl = document.getElementById("recapExpenseList");
-      if (recap.expense_items.length === 0) {
-        expListEl.innerHTML = `<p class="text-xs text-gray-400">Tidak ada pengeluaran.</p>`;
+      // Payment breakdown
+      const recapPayEl = document.getElementById("recapPaymentBreakdown");
+      if (recap.payment_breakdown && recap.payment_breakdown.length > 0) {
+        // Merge with online incomes
+        const merged = {};
+        recap.payment_breakdown.forEach((p) => {
+          merged[p.payment_method] = { total: p.total, count: p.count };
+        });
+        if (recap.online_income_items) {
+          recap.online_income_items.forEach((item) => {
+            const key = item.source;
+            if (!merged[key]) merged[key] = { total: 0, count: 0 };
+            merged[key].total += item.amount;
+            merged[key].count += 1;
+          });
+        }
+        recapPayEl.innerHTML = Object.keys(merged)
+          .map((method) => {
+            const p = merged[method];
+            return `
+            <div class="flex items-center justify-between text-sm bg-blue-50 rounded-lg px-3 py-2">
+              <span class="font-medium text-gray-700">${paymentLabel(method)} <span class="text-xs text-gray-400">(${p.count}x)</span></span>
+              <span class="font-semibold text-gray-800">${formatRupiah(p.total)}</span>
+            </div>`;
+          })
+          .join("");
       } else {
-        expListEl.innerHTML = recap.expense_items
+        recapPayEl.innerHTML = `<p class="text-xs text-gray-400">Tidak ada data pembayaran.</p>`;
+      }
+
+      // Expense items by category
+      const expCatEl = document.getElementById("recapExpenseCategoryList");
+      const expItemsEl = document.getElementById("recapExpenseItemsList");
+      if (recap.expenses_by_category && recap.expenses_by_category.length > 0) {
+        expCatEl.innerHTML = recap.expenses_by_category
           .map(
-            (exp) => `
+            (cat) => `
           <div class="flex items-center justify-between text-sm bg-red-50 rounded-lg px-3 py-2">
-            <div>
-              <span class="font-medium text-gray-700">${exp.description}</span>
-              <span class="text-xs text-gray-400 ml-1">(${exp.category})</span>
-            </div>
-            <span class="font-semibold text-red-600">- ${formatRupiah(exp.amount)}</span>
+            <span class="font-medium text-gray-700">${cat.category} <span class="text-xs text-gray-400">(${cat.count} item)</span></span>
+            <span class="font-semibold text-red-600">${formatRupiah(cat.total)}</span>
           </div>`
           )
           .join("");
+      } else {
+        expCatEl.innerHTML = `<p class="text-xs text-gray-400">Tidak ada pengeluaran.</p>`;
+      }
+
+      // Individual expense items
+      if (recap.expense_items.length > 0) {
+        expItemsEl.innerHTML = `<details class="mt-1">
+          <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-700">Lihat detail (${recap.expense_items.length} item)</summary>
+          <div class="mt-1 space-y-1">` +
+          recap.expense_items
+            .map(
+              (exp) => `
+            <div class="flex items-center justify-between text-xs bg-gray-50 rounded-lg px-3 py-1.5">
+              <span class="text-gray-600">${exp.description} <span class="text-gray-400">(${exp.category})</span></span>
+              <span class="font-semibold text-red-600">- ${formatRupiah(exp.amount)}</span>
+            </div>`
+            )
+            .join("") +
+          `</div></details>`;
+      } else {
+        expItemsEl.innerHTML = "";
       }
 
       // Online Income items
@@ -697,6 +918,25 @@
           </div>`
           )
           .join("");
+      }
+
+      // Top items
+      const topItemsEl = document.getElementById("recapTopItems");
+      if (recap.top_items && recap.top_items.length > 0) {
+        topItemsEl.innerHTML = recap.top_items
+          .map(
+            (item, idx) => `
+          <div class="flex items-center justify-between text-sm bg-amber-50 rounded-lg px-3 py-2">
+            <span class="text-gray-700">${idx + 1}. ${item.menu_name}</span>
+            <div class="flex items-center gap-3">
+              <span class="text-xs text-gray-400">${formatRupiah(item.total_revenue)}</span>
+              <span class="font-bold text-amber-700">${item.total_qty}x</span>
+            </div>
+          </div>`
+          )
+          .join("");
+      } else {
+        topItemsEl.innerHTML = `<p class="text-xs text-gray-400">Tidak ada data menu terlaris.</p>`;
       }
 
       // Transactions table
@@ -729,6 +969,115 @@
     } catch (err) {
       alert("Gagal memuat rekap: " + err.message);
     }
+  }
+
+  // ==================== COPY / EXPORT RECAP ====================
+  function buildRecapText() {
+    if (!lastRecapData) return "";
+    const r = lastRecapData;
+    let text = `REKAP TRANSAKSI HARIAN\nTanggal: ${r.date}\n${"=".repeat(40)}\n\n`;
+    text += `Jumlah Transaksi: ${r.count}\n`;
+    text += `Pendapatan Kotor: ${formatRupiah(r.gross)}\n`;
+    text += `Pengeluaran: ${formatRupiah(r.expenses)}\n`;
+    text += `Pendapatan Bersih: ${formatRupiah(r.net)}\n\n`;
+
+    // Payment breakdown
+    if (r.payment_breakdown && r.payment_breakdown.length > 0) {
+      text += `METODE PEMBAYARAN\n${"─".repeat(30)}\n`;
+      r.payment_breakdown.forEach((p) => {
+        text += `${paymentLabel(p.payment_method)} (${p.count}x): ${formatRupiah(p.total)}\n`;
+      });
+      text += "\n";
+    }
+
+    if (r.expenses_by_category && r.expenses_by_category.length > 0) {
+      text += `PENGELUARAN PER KATEGORI\n${"─".repeat(30)}\n`;
+      r.expenses_by_category.forEach((cat) => {
+        text += `${cat.category}: ${formatRupiah(cat.total)} (${cat.count} item)\n`;
+      });
+      text += "\n";
+    }
+
+    if (r.expense_items && r.expense_items.length > 0) {
+      text += `DETAIL PENGELUARAN\n${"─".repeat(30)}\n`;
+      r.expense_items.forEach((exp) => {
+        text += `• ${exp.description} (${exp.category}): ${formatRupiah(exp.amount)}\n`;
+      });
+      text += "\n";
+    }
+
+    if (r.online_income_items && r.online_income_items.length > 0) {
+      text += `PENDAPATAN ONLINE\n${"─".repeat(30)}\n`;
+      r.online_income_items.forEach((inc) => {
+        text += `• ${inc.source}: + ${formatRupiah(inc.amount)}\n`;
+      });
+      text += "\n";
+    }
+
+    if (r.top_items && r.top_items.length > 0) {
+      text += `MENU TERLARIS\n${"─".repeat(30)}\n`;
+      r.top_items.forEach((item, idx) => {
+        text += `${idx + 1}. ${item.menu_name} — ${item.total_qty}x (${formatRupiah(item.total_revenue)})\n`;
+      });
+      text += "\n";
+    }
+
+    if (r.transactions && r.transactions.length > 0) {
+      text += `DAFTAR TRANSAKSI\n${"─".repeat(30)}\n`;
+      r.transactions.forEach((tx) => {
+        const time = new Date(tx.created_at + "Z").toLocaleString("id-ID", { timeStyle: "short" });
+        text += `${tx.transaction_code} | ${time} | ${paymentLabel(tx.payment_method)} | ${formatRupiah(tx.grand_total)}\n`;
+      });
+    }
+
+    return text;
+  }
+
+  function copyRecap() {
+    const text = buildRecapText();
+    navigator.clipboard.writeText(text).then(() => showToast("✅ Rekap disalin ke clipboard!"));
+  }
+
+  function downloadRecapCsv() {
+    if (!lastRecapData) return;
+    const r = lastRecapData;
+
+    let csv = `Rekap Tanggal: ${r.date}\n\n`;
+    csv += "Ringkasan\n";
+    csv += "Keterangan,Nilai\n";
+    csv += `Jumlah Transaksi,${r.count}\n`;
+    csv += `Pendapatan Kotor,${r.gross}\n`;
+    csv += `Pengeluaran,${r.expenses}\n`;
+    csv += `Pendapatan Bersih,${r.net}\n\n`;
+
+    if (r.expenses_by_category && r.expenses_by_category.length > 0) {
+      csv += "Pengeluaran per Kategori\n";
+      csv += "Kategori,Total,Jumlah Item\n";
+      r.expenses_by_category.forEach((cat) => {
+        csv += `"${cat.category}",${cat.total},${cat.count}\n`;
+      });
+      csv += "\n";
+    }
+
+    if (r.expense_items && r.expense_items.length > 0) {
+      csv += "Detail Pengeluaran\n";
+      csv += "Tanggal,Kategori,Keterangan,Jumlah\n";
+      r.expense_items.forEach((exp) => {
+        csv += `${r.date},"${exp.category}","${exp.description}",${exp.amount}\n`;
+      });
+      csv += "\n";
+    }
+
+    if (r.transactions && r.transactions.length > 0) {
+      csv += "Daftar Transaksi\n";
+      csv += "Kode,Waktu,Pembayaran,Total,Kasir\n";
+      r.transactions.forEach((tx) => {
+        const time = new Date(tx.created_at + "Z").toLocaleString("id-ID", { timeStyle: "short" });
+        csv += `${tx.transaction_code},${time},"${paymentLabel(tx.payment_method)}",${tx.grand_total},${tx.cashier_username}\n`;
+      });
+    }
+
+    downloadCsv(csv, `rekap_${r.date}.csv`);
   }
 
   // ==================== EXPENSES ====================

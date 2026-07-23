@@ -23,6 +23,7 @@ const VALID_EXPENSE_CATEGORIES = [
   "Belanja Harian",
   "Gaji Karyawan",
   "Operasional",
+  "Tabungan",
   "Lainnya",
 ];
 
@@ -311,6 +312,14 @@ app.get("/api/transactions/recap", authMiddleware, async (req, res) => {
       [date]
     );
 
+    // Expenses grouped by category
+    const expensesByCategory = await query(
+      `SELECT category, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
+       FROM expenses WHERE expense_date = ?
+       GROUP BY category ORDER BY category`,
+      [date]
+    );
+
     const onlineIncomeRows = await query(
       `SELECT COALESCE(SUM(amount), 0) AS total FROM online_incomes WHERE income_date = ?`,
       [date]
@@ -318,6 +327,26 @@ app.get("/api/transactions/recap", authMiddleware, async (req, res) => {
 
     const onlineIncomeItems = await query(
       `SELECT * FROM online_incomes WHERE income_date = ? ORDER BY created_at DESC`,
+      [date]
+    );
+
+    // Top items for the selected date
+    const topItems = await query(
+      `SELECT menu_name, SUM(quantity) AS total_qty, SUM(line_total) AS total_revenue
+       FROM transaction_items ti
+       JOIN transactions t ON ti.transaction_id = t.id
+       WHERE date(t.created_at) = ?
+       GROUP BY menu_name
+       ORDER BY total_qty DESC
+       LIMIT 10`,
+      [date]
+    );
+
+    // Payment breakdown for the selected date
+    const paymentBreakdown = await query(
+      `SELECT payment_method, COALESCE(SUM(grand_total), 0) AS total, COUNT(*) AS count
+       FROM transactions WHERE date(created_at) = ?
+       GROUP BY payment_method`,
       [date]
     );
 
@@ -331,7 +360,10 @@ app.get("/api/transactions/recap", authMiddleware, async (req, res) => {
       net: finalGross - expenseRows[0].total,
       transactions: txRows,
       expense_items: expenseItems,
+      expenses_by_category: expensesByCategory,
       online_income_items: onlineIncomeItems,
+      top_items: topItems,
+      payment_breakdown: paymentBreakdown,
     });
   } catch (err) {
     console.error("Recap error:", err);
@@ -584,13 +616,20 @@ app.get("/api/dashboard", authMiddleware, async (req, res) => {
     const totalOnlineRows = await query(`SELECT COALESCE(SUM(amount), 0) AS total FROM online_incomes`);
     const todayOnlineItems = await query(`SELECT * FROM online_incomes WHERE income_date = date('now') ORDER BY created_at DESC`);
 
-    // Expenses (Pengeluaran) — belanja harian, gaji karyawan, operasional, dll.
+    // Expenses (Pengeluaran) — belanja harian, gaji karyawan, operasional, tabungan, dll.
     const todayExpenseRows = await query(
       `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE expense_date = date('now')`
     );
     const totalExpenseRows = await query(`SELECT COALESCE(SUM(amount), 0) AS total FROM expenses`);
     const todayExpenseItems = await query(
       `SELECT * FROM expenses WHERE expense_date = date('now') ORDER BY created_at DESC`
+    );
+
+    // Expenses grouped by category for today
+    const expensesByCategoryToday = await query(
+      `SELECT category, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
+       FROM expenses WHERE expense_date = date('now')
+       GROUP BY category ORDER BY category`
     );
 
     // Calculate final totals
@@ -603,12 +642,15 @@ app.get("/api/dashboard", authMiddleware, async (req, res) => {
     const dailyNet = finalGrossToday - todayExpenseRows[0].total;
     const totalNet = finalGrossTotal - totalExpenseRows[0].total;
 
-    const topItems = await query(`
+    // Top items today (harian)
+    const topItemsToday = await query(`
       SELECT menu_name, SUM(quantity) AS total_qty, SUM(line_total) AS total_revenue
-      FROM transaction_items
+      FROM transaction_items ti
+      JOIN transactions t ON ti.transaction_id = t.id
+      WHERE date(t.created_at) = date('now')
       GROUP BY menu_name
       ORDER BY total_qty DESC
-      LIMIT 5
+      LIMIT 10
     `);
 
     const paymentBreakdownToday = await query(`
@@ -623,6 +665,7 @@ app.get("/api/dashboard", authMiddleware, async (req, res) => {
       count_today: todayGrossRows[0].count,
       expenses_today: todayExpenseRows[0].total,
       expense_items_today: todayExpenseItems,
+      expenses_by_category_today: expensesByCategoryToday,
       online_income_items_today: todayOnlineItems,
       net_today: dailyNet,
 
@@ -637,7 +680,7 @@ app.get("/api/dashboard", authMiddleware, async (req, res) => {
       expenses_total: totalExpenseRows[0].total,
       net_total: totalNet,
 
-      top_items: topItems,
+      top_items_today: topItemsToday,
       payment_breakdown_today: paymentBreakdownToday,
     });
   } catch (err) {
@@ -673,6 +716,103 @@ app.get("/api/dashboard/daily-chart", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Daily chart error:", err);
     res.status(500).json({ error: "Gagal memuat data chart." });
+  }
+});
+
+// ---------- FINANCE REPORT ----------
+app.get("/api/finance/report", authMiddleware, async (req, res) => {
+  try {
+    const from = req.query.from || todayStr();
+    const to = req.query.to || todayStr();
+
+    // Gross revenue from transactions
+    const grossRows = await query(
+      `SELECT COALESCE(SUM(grand_total), 0) AS total, COUNT(*) AS count
+       FROM transactions WHERE date(created_at) >= ? AND date(created_at) <= ?`,
+      [from, to]
+    );
+
+    // Online incomes
+    const onlineRows = await query(
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM online_incomes
+       WHERE income_date >= ? AND income_date <= ?`,
+      [from, to]
+    );
+
+    const onlineBySource = await query(
+      `SELECT source, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
+       FROM online_incomes WHERE income_date >= ? AND income_date <= ?
+       GROUP BY source ORDER BY source`,
+      [from, to]
+    );
+
+    // Total expenses
+    const expenseTotalRows = await query(
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses
+       WHERE expense_date >= ? AND expense_date <= ?`,
+      [from, to]
+    );
+
+    // Expenses grouped by category
+    const expensesByCategory = await query(
+      `SELECT category, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
+       FROM expenses WHERE expense_date >= ? AND expense_date <= ?
+       GROUP BY category ORDER BY category`,
+      [from, to]
+    );
+
+    // All expense items in range
+    const expenseItems = await query(
+      `SELECT * FROM expenses WHERE expense_date >= ? AND expense_date <= ?
+       ORDER BY expense_date DESC, created_at DESC`,
+      [from, to]
+    );
+
+    // Daily breakdown
+    const dailyBreakdown = await query(
+      `SELECT date(created_at) AS date, COALESCE(SUM(grand_total), 0) AS gross, COUNT(*) AS count
+       FROM transactions WHERE date(created_at) >= ? AND date(created_at) <= ?
+       GROUP BY date(created_at) ORDER BY date(created_at) ASC`,
+      [from, to]
+    );
+
+    // Enrich daily breakdown with expenses
+    const dailyExpenses = await query(
+      `SELECT expense_date AS date, COALESCE(SUM(amount), 0) AS total
+       FROM expenses WHERE expense_date >= ? AND expense_date <= ?
+       GROUP BY expense_date ORDER BY expense_date ASC`,
+      [from, to]
+    );
+
+    // Payment breakdown
+    const paymentBreakdown = await query(
+      `SELECT payment_method, COALESCE(SUM(grand_total), 0) AS total, COUNT(*) AS count
+       FROM transactions WHERE date(created_at) >= ? AND date(created_at) <= ?
+       GROUP BY payment_method ORDER BY total DESC`,
+      [from, to]
+    );
+
+    const finalGross = grossRows[0].total + onlineRows[0].total;
+    const expensesTotal = expenseTotalRows[0].total;
+
+    res.json({
+      from,
+      to,
+      gross: finalGross,
+      transaction_count: grossRows[0].count,
+      online_income_total: onlineRows[0].total,
+      online_by_source: onlineBySource,
+      expenses_total: expensesTotal,
+      expenses_by_category: expensesByCategory,
+      expense_items: expenseItems,
+      net: finalGross - expensesTotal,
+      daily_breakdown: dailyBreakdown,
+      daily_expenses: dailyExpenses,
+      payment_breakdown: paymentBreakdown,
+    });
+  } catch (err) {
+    console.error("Finance report error:", err);
+    res.status(500).json({ error: "Gagal memuat laporan keuangan." });
   }
 });
 

@@ -64,6 +64,7 @@ function renderNavbar(active) {
     { href: "/dashboard.html", label: "Dashboard", key: "dashboard" },
     { href: "/pos.html", label: "Kasir (POS)", key: "pos" },
     { href: "/menu.html", label: "Manajemen Menu", key: "menu" },
+    { href: "/finance.html", label: "Finance Report", key: "finance" },
   ];
   navEl.innerHTML = `
     <div class="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">

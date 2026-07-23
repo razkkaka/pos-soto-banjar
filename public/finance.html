@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Finance Report - Soto Banjar "Nyaman"</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<nav id="navbar" class="bg-white shadow-sm sticky top-0 z-10"></nav>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800">📊 Finance Report</h1>
+      <p class="text-gray-500 text-sm">Laporan keuangan lengkap per periode</p>
+    </div>
+  </div>
+
+  <!-- Filter Section -->
+  <div class="bg-white rounded-2xl shadow p-5 mb-6">
+    <div class="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+      <div class="flex flex-wrap gap-2">
+        <button onclick="setPreset('today')" class="preset-btn px-3 py-2 rounded-lg text-xs font-semibold border transition bg-orange-600 text-white border-orange-600" data-preset="today">Hari Ini</button>
+        <button onclick="setPreset('week')" class="preset-btn px-3 py-2 rounded-lg text-xs font-semibold border transition bg-white text-gray-500 border-gray-300 hover:border-orange-300" data-preset="week">Minggu Ini</button>
+        <button onclick="setPreset('month')" class="preset-btn px-3 py-2 rounded-lg text-xs font-semibold border transition bg-white text-gray-500 border-gray-300 hover:border-orange-300" data-preset="month">Bulan Ini</button>
+        <button onclick="setPreset('lastmonth')" class="preset-btn px-3 py-2 rounded-lg text-xs font-semibold border transition bg-white text-gray-500 border-gray-300 hover:border-orange-300" data-preset="lastmonth">Bulan Lalu</button>
+        <button onclick="setPreset('custom')" class="preset-btn px-3 py-2 rounded-lg text-xs font-semibold border transition bg-white text-gray-500 border-gray-300 hover:border-orange-300" data-preset="custom">Custom</button>
+      </div>
+      <div class="flex items-center gap-2">
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">Dari</label>
+          <input type="date" id="filterFrom" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">Sampai</label>
+          <input type="date" id="filterTo" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+        </div>
+        <div class="self-end">
+          <button onclick="loadReport()" class="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition">
+            Tampilkan
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="loadingState" class="hidden text-center text-gray-400 py-16">Memuat laporan...</div>
+
+  <div id="reportContent" class="hidden">
+    <!-- Summary Cards -->
+    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Ringkasan Keuangan</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-amber-500">
+        <p class="text-sm text-gray-500 mb-1">Pendapatan Kotor</p>
+        <p class="text-2xl font-bold text-gray-800" id="rptGross">Rp 0</p>
+        <p class="text-xs text-gray-400 mt-1"><span id="rptTxCount">0</span> transaksi</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-red-400">
+        <p class="text-sm text-gray-500 mb-1">Total Pengeluaran</p>
+        <p class="text-2xl font-bold text-red-600" id="rptExpenses">Rp 0</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-emerald-500">
+        <p class="text-sm text-gray-500 mb-1">Pendapatan Bersih</p>
+        <p class="text-2xl font-bold" id="rptNet">Rp 0</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-blue-400">
+        <p class="text-sm text-gray-500 mb-1">Pendapatan Online</p>
+        <p class="text-2xl font-bold text-blue-700" id="rptOnline">Rp 0</p>
+        <div id="rptOnlineBreakdown" class="mt-1"></div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <!-- Pengeluaran per Kategori + Donut Chart -->
+      <div class="lg:col-span-2 bg-white rounded-2xl shadow overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 class="font-bold text-gray-800">Pengeluaran per Kategori</h2>
+            <p class="text-xs text-gray-400 mt-0.5">Rincian pengeluaran yang sudah keluar</p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="copyExpenseReport()" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 transition">📋 Copy</button>
+            <button onclick="downloadExpenseReportCsv()" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 transition">📥 Excel</button>
+          </div>
+        </div>
+        <div class="px-5 py-4">
+          <div id="rptCategoryBreakdown" class="space-y-2 mb-4"></div>
+          <div class="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between">
+            <span class="text-sm font-bold text-gray-700">Grand Total Pengeluaran</span>
+            <span class="text-sm font-bold text-red-700" id="rptExpensesGrandTotal">Rp 0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Donut Chart -->
+      <div class="bg-white rounded-2xl shadow p-5">
+        <h2 class="font-bold text-gray-800 mb-4">Distribusi Pengeluaran</h2>
+        <div class="relative" style="height: 250px;">
+          <canvas id="expenseDonutChart"></canvas>
+        </div>
+        <div id="donutLegend" class="mt-4 space-y-1"></div>
+      </div>
+    </div>
+
+    <!-- Payment Breakdown -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div class="bg-white rounded-2xl shadow p-5">
+        <h2 class="font-bold text-gray-800 mb-3">Metode Pembayaran</h2>
+        <div id="rptPaymentBreakdown" class="space-y-2"></div>
+      </div>
+
+      <!-- Daily Chart -->
+      <div class="bg-white rounded-2xl shadow p-5">
+        <h2 class="font-bold text-gray-800 mb-3">Pendapatan Harian</h2>
+        <div class="relative" style="height: 250px;">
+          <canvas id="dailyRevenueChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail Pengeluaran Table -->
+    <div class="bg-white rounded-2xl shadow overflow-hidden mb-8">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div>
+          <h2 class="font-bold text-gray-800">Detail Semua Pengeluaran</h2>
+          <p class="text-xs text-gray-400 mt-0.5" id="rptExpenseCount">0 pengeluaran tercatat</p>
+        </div>
+        <button onclick="downloadFullExpenseCsv()" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 transition">📥 Download Semua</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-500">
+            <tr>
+              <th class="text-left px-5 py-3 font-medium">Tanggal</th>
+              <th class="text-left px-5 py-3 font-medium">Kategori</th>
+              <th class="text-left px-5 py-3 font-medium">Keterangan</th>
+              <th class="text-right px-5 py-3 font-medium">Jumlah</th>
+              <th class="text-left px-5 py-3 font-medium">Oleh</th>
+            </tr>
+          </thead>
+          <tbody id="rptExpenseTableBody" class="divide-y divide-gray-100"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Empty State -->
+  <div id="emptyState" class="hidden text-center py-16">
+    <p class="text-gray-400 text-lg mb-2">📋</p>
+    <p class="text-gray-500">Pilih periode dan klik "Tampilkan" untuk melihat laporan keuangan.</p>
+  </div>
+</main>
+
+<!-- Copy success toast -->
+<div id="copyToast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-sm px-5 py-2.5 rounded-xl shadow-lg transition-all duration-300 opacity-0 pointer-events-none z-50">
+  ✅ Berhasil disalin ke clipboard!
+</div>
+
+<script src="/js/auth.js"></script>
+<script>
+  requireAuth();
+  renderNavbar("finance");
+
+  const PAYMENT_LABELS = {
+    cash: "Tunai (Cash)",
+    qris: "QRIS",
+    transfer: "Transfer Bank",
+    gojek: "GoFood / Gojek",
+    shopee: "ShopeeFood",
+    other: "Lainnya",
+  };
+
+  function paymentLabel(method) {
+    return PAYMENT_LABELS[method] || method;
+  }
+
+  const CATEGORY_COLORS = {
+    "Belanja Harian": { bg: "rgba(234, 88, 12, 0.8)", light: "bg-orange-100 text-orange-800" },
+    "Gaji Karyawan": { bg: "rgba(59, 130, 246, 0.8)", light: "bg-blue-100 text-blue-800" },
+    "Operasional": { bg: "rgba(168, 85, 247, 0.8)", light: "bg-purple-100 text-purple-800" },
+    "Tabungan": { bg: "rgba(16, 185, 129, 0.8)", light: "bg-emerald-100 text-emerald-800" },
+    "Lainnya": { bg: "rgba(107, 114, 128, 0.8)", light: "bg-gray-100 text-gray-800" },
+  };
+
+  let reportData = null;
+  let donutChartInstance = null;
+  let dailyChartInstance = null;
+  let activePreset = "today";
+
+  // ==================== TOAST ====================
+  function showToast(msg) {
+    const toast = document.getElementById("copyToast");
+    toast.textContent = msg || "✅ Berhasil disalin ke clipboard!";
+    toast.classList.remove("opacity-0", "pointer-events-none");
+    toast.classList.add("opacity-100");
+    setTimeout(() => {
+      toast.classList.remove("opacity-100");
+      toast.classList.add("opacity-0", "pointer-events-none");
+    }, 2000);
+  }
+
+  // ==================== DATE PRESETS ====================
+  function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+  function mondayStr() {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diff);
+    return monday.toISOString().slice(0, 10);
+  }
+
+  function firstOfMonthStr() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  }
+
+  function lastMonthRange() {
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const last = new Date(now.getFullYear(), now.getMonth(), 0);
+    return {
+      from: first.toISOString().slice(0, 10),
+      to: last.toISOString().slice(0, 10),
+    };
+  }
+
+  function setPreset(preset) {
+    activePreset = preset;
+    const fromEl = document.getElementById("filterFrom");
+    const toEl = document.getElementById("filterTo");
+
+    switch (preset) {
+      case "today":
+        fromEl.value = todayStr();
+        toEl.value = todayStr();
+        break;
+      case "week":
+        fromEl.value = mondayStr();
+        toEl.value = todayStr();
+        break;
+      case "month":
+        fromEl.value = firstOfMonthStr();
+        toEl.value = todayStr();
+        break;
+      case "lastmonth":
+        const lm = lastMonthRange();
+        fromEl.value = lm.from;
+        toEl.value = lm.to;
+        break;
+      case "custom":
+        // User fills manually
+        break;
+    }
+
+    // Update button styles
+    document.querySelectorAll(".preset-btn").forEach((btn) => {
+      if (btn.dataset.preset === preset) {
+        btn.className = "preset-btn px-3 py-2 rounded-lg text-xs font-semibold border transition bg-orange-600 text-white border-orange-600";
+      } else {
+        btn.className = "preset-btn px-3 py-2 rounded-lg text-xs font-semibold border transition bg-white text-gray-500 border-gray-300 hover:border-orange-300";
+      }
+    });
+
+    if (preset !== "custom") {
+      loadReport();
+    }
+  }
+
+  // Init with today
+  document.getElementById("filterFrom").value = todayStr();
+  document.getElementById("filterTo").value = todayStr();
+
+  // ==================== LOAD REPORT ====================
+  async function loadReport() {
+    const from = document.getElementById("filterFrom").value;
+    const to = document.getElementById("filterTo").value;
+    if (!from || !to) {
+      alert("Silakan pilih tanggal dari dan sampai.");
+      return;
+    }
+
+    document.getElementById("loadingState").classList.remove("hidden");
+    document.getElementById("reportContent").classList.add("hidden");
+    document.getElementById("emptyState").classList.add("hidden");
+
+    try {
+      const data = await apiFetch(`/api/finance/report?from=${from}&to=${to}`);
+      reportData = data;
+      renderReport(data);
+      document.getElementById("loadingState").classList.add("hidden");
+      document.getElementById("reportContent").classList.remove("hidden");
+    } catch (err) {
+      document.getElementById("loadingState").textContent = "Gagal memuat laporan: " + err.message;
+    }
+  }
+
+  // ==================== RENDER REPORT ====================
+  function renderReport(data) {
+    // Summary cards
+    document.getElementById("rptGross").textContent = formatRupiah(data.gross);
+    document.getElementById("rptTxCount").textContent = data.transaction_count;
+    document.getElementById("rptExpenses").textContent = formatRupiah(data.expenses_total);
+
+    const netEl = document.getElementById("rptNet");
+    netEl.textContent = formatRupiah(data.net);
+    netEl.className = "text-2xl font-bold " + (data.net < 0 ? "text-red-600" : "text-emerald-700");
+
+    document.getElementById("rptOnline").textContent = formatRupiah(data.online_income_total);
+    const onlineBreakdown = document.getElementById("rptOnlineBreakdown");
+    if (data.online_by_source && data.online_by_source.length > 0) {
+      onlineBreakdown.innerHTML = data.online_by_source
+        .map((s) => `<p class="text-xs text-gray-400">${s.source === "gojek" ? "GoFood" : "ShopeeFood"}: ${formatRupiah(s.total)} (${s.count}x)</p>`)
+        .join("");
+    } else {
+      onlineBreakdown.innerHTML = "";
+    }
+
+    // Category breakdown
+    const catEl = document.getElementById("rptCategoryBreakdown");
+    document.getElementById("rptExpensesGrandTotal").textContent = formatRupiah(data.expenses_total);
+    if (data.expenses_by_category.length === 0) {
+      catEl.innerHTML = `<p class="text-sm text-gray-400 py-4 text-center">Tidak ada pengeluaran dalam periode ini.</p>`;
+    } else {
+      const maxVal = Math.max(...data.expenses_by_category.map((c) => c.total));
+      catEl.innerHTML = data.expenses_by_category
+        .map((cat) => {
+          const pct = maxVal > 0 ? Math.round((cat.total / maxVal) * 100) : 0;
+          const colorInfo = CATEGORY_COLORS[cat.category] || CATEGORY_COLORS["Lainnya"];
+          return `
+          <div>
+            <div class="flex items-center justify-between text-sm mb-1">
+              <div class="flex items-center gap-2">
+                <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold ${colorInfo.light}">${cat.category}</span>
+                <span class="text-gray-400 text-xs">${cat.count} item</span>
+              </div>
+              <span class="font-bold text-gray-800">${formatRupiah(cat.total)}</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2">
+              <div class="h-2 rounded-full transition-all duration-500" style="width: ${pct}%; background: ${colorInfo.bg}"></div>
+            </div>
+          </div>`;
+        })
+        .join("");
+    }
+
+    // Donut chart
+    renderDonutChart(data.expenses_by_category);
+
+    // Payment breakdown
+    const payEl = document.getElementById("rptPaymentBreakdown");
+    if (data.payment_breakdown.length === 0) {
+      payEl.innerHTML = `<p class="text-sm text-gray-400">Tidak ada data pembayaran.</p>`;
+    } else {
+      payEl.innerHTML = data.payment_breakdown
+        .map(
+          (p) => `
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-gray-600">${paymentLabel(p.payment_method)} <span class="text-gray-400">(${p.count}x)</span></span>
+          <span class="font-semibold text-gray-800">${formatRupiah(p.total)}</span>
+        </div>`
+        )
+        .join("");
+    }
+
+    // Daily chart
+    renderDailyRevenueChart(data.daily_breakdown, data.daily_expenses);
+
+    // Expense table
+    document.getElementById("rptExpenseCount").textContent = `${data.expense_items.length} pengeluaran tercatat`;
+    const tbody = document.getElementById("rptExpenseTableBody");
+    if (data.expense_items.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-gray-400 py-8">Tidak ada pengeluaran dalam periode ini.</td></tr>`;
+    } else {
+      tbody.innerHTML = data.expense_items
+        .map((exp) => {
+          const colorInfo = CATEGORY_COLORS[exp.category] || CATEGORY_COLORS["Lainnya"];
+          return `
+          <tr class="hover:bg-gray-50">
+            <td class="px-5 py-3 text-gray-500">${exp.expense_date}</td>
+            <td class="px-5 py-3"><span class="inline-block px-2 py-0.5 rounded text-xs font-semibold ${colorInfo.light}">${exp.category}</span></td>
+            <td class="px-5 py-3 text-gray-700">${exp.description}</td>
+            <td class="px-5 py-3 text-right font-semibold text-red-600">${formatRupiah(exp.amount)}</td>
+            <td class="px-5 py-3 text-gray-500">${exp.created_by || "-"}</td>
+          </tr>`;
+        })
+        .join("");
+    }
+  }
+
+  // ==================== CHARTS ====================
+  function renderDonutChart(categories) {
+    const ctx = document.getElementById("expenseDonutChart").getContext("2d");
+    if (donutChartInstance) donutChartInstance.destroy();
+
+    if (!categories || categories.length === 0) {
+      document.getElementById("donutLegend").innerHTML = `<p class="text-xs text-gray-400 text-center">Tidak ada data</p>`;
+      return;
+    }
+
+    const labels = categories.map((c) => c.category);
+    const values = categories.map((c) => c.total);
+    const colors = categories.map((c) => (CATEGORY_COLORS[c.category] || CATEGORY_COLORS["Lainnya"]).bg);
+    const total = values.reduce((s, v) => s + v, 0);
+
+    donutChartInstance = new Chart(ctx, {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor: colors,
+          borderWidth: 2,
+          borderColor: "#fff",
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "65%",
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const pct = total > 0 ? Math.round((ctx.raw / total) * 100) : 0;
+                return `${ctx.label}: ${formatRupiah(ctx.raw)} (${pct}%)`;
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Custom legend
+    document.getElementById("donutLegend").innerHTML = categories
+      .map((c) => {
+        const pct = total > 0 ? Math.round((c.total / total) * 100) : 0;
+        const colorInfo = CATEGORY_COLORS[c.category] || CATEGORY_COLORS["Lainnya"];
+        return `
+        <div class="flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full inline-block" style="background: ${colorInfo.bg}"></span>
+            <span class="text-gray-600">${c.category}</span>
+          </div>
+          <span class="font-semibold text-gray-700">${pct}%</span>
+        </div>`;
+      })
+      .join("");
+  }
+
+  function renderDailyRevenueChart(dailyBreakdown, dailyExpenses) {
+    const ctx = document.getElementById("dailyRevenueChart").getContext("2d");
+    if (dailyChartInstance) dailyChartInstance.destroy();
+
+    if (!dailyBreakdown || dailyBreakdown.length === 0) return;
+
+    // Build expense map
+    const expMap = {};
+    if (dailyExpenses) {
+      dailyExpenses.forEach((d) => { expMap[d.date] = d.total; });
+    }
+
+    const labels = dailyBreakdown.map((d) => {
+      const dt = new Date(d.date + "T00:00:00");
+      return dt.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+    });
+    const revenues = dailyBreakdown.map((d) => d.gross);
+    const expenses = dailyBreakdown.map((d) => expMap[d.date] || 0);
+
+    dailyChartInstance = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Pendapatan",
+            data: revenues,
+            backgroundColor: "rgba(234, 88, 12, 0.7)",
+            borderColor: "rgba(234, 88, 12, 1)",
+            borderWidth: 1,
+            borderRadius: 4,
+            borderSkipped: false,
+          },
+          {
+            label: "Pengeluaran",
+            data: expenses,
+            backgroundColor: "rgba(239, 68, 68, 0.5)",
+            borderColor: "rgba(239, 68, 68, 1)",
+            borderWidth: 1,
+            borderRadius: 4,
+            borderSkipped: false,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: "top",
+            labels: { font: { size: 11 }, boxWidth: 12, padding: 10 },
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.dataset.label}: ${formatRupiah(ctx.raw)}`,
+            },
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { callback: (v) => "Rp " + Number(v).toLocaleString("id-ID") },
+            grid: { color: "rgba(0,0,0,0.05)" },
+          },
+          x: { grid: { display: false } },
+        },
+      },
+    });
+  }
+
+  // ==================== COPY / EXPORT ====================
+  function copyExpenseReport() {
+    if (!reportData) return;
+    const d = reportData;
+    let text = `LAPORAN PENGELUARAN\nPeriode: ${d.from} s/d ${d.to}\n${"=".repeat(40)}\n\n`;
+
+    if (d.expenses_by_category.length > 0) {
+      d.expenses_by_category.forEach((cat) => {
+        text += `📁 ${cat.category}: ${formatRupiah(cat.total)} (${cat.count} item)\n`;
+      });
+      text += `\n${"─".repeat(40)}\nGRAND TOTAL: ${formatRupiah(d.expenses_total)}\n\n`;
+    }
+
+    if (d.expense_items.length > 0) {
+      text += `DETAIL:\n`;
+      d.expense_items.forEach((exp) => {
+        text += `[${exp.expense_date}] ${exp.category} - ${exp.description}: ${formatRupiah(exp.amount)}\n`;
+      });
+    }
+
+    navigator.clipboard.writeText(text).then(() => showToast("✅ Laporan pengeluaran disalin!"));
+  }
+
+  function downloadExpenseReportCsv() {
+    if (!reportData) return;
+    const d = reportData;
+    let csv = `Laporan Pengeluaran ${d.from} s/d ${d.to}\n\n`;
+    csv += "Ringkasan per Kategori\n";
+    csv += "Kategori,Total,Jumlah Item\n";
+    d.expenses_by_category.forEach((cat) => {
+      csv += `"${cat.category}",${cat.total},${cat.count}\n`;
+    });
+    csv += `\nGrand Total,${d.expenses_total}\n`;
+    downloadCsv(csv, `laporan_pengeluaran_${d.from}_${d.to}.csv`);
+  }
+
+  function downloadFullExpenseCsv() {
+    if (!reportData) return;
+    const d = reportData;
+    let csv = "Tanggal,Kategori,Keterangan,Jumlah,Oleh\n";
+    d.expense_items.forEach((exp) => {
+      csv += `${exp.expense_date},"${exp.category}","${exp.description}",${exp.amount},"${exp.created_by || ""}"\n`;
+    });
+    downloadCsv(csv, `detail_pengeluaran_${d.from}_${d.to}.csv`);
+  }
+
+  function downloadCsv(content, filename) {
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Load report on page load
+  loadReport();
+</script>
+</body>
+</html>
