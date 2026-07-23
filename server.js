@@ -65,7 +65,7 @@ function mondayOfThisWeekStr() {
   const w = nowWIB();
   const day = w.dayOfWeek; // 0 = Sunday ... 6 = Saturday
   const diffToMonday = day === 0 ? -6 : 1 - day;
-  const monday = new Date(`${w.year}-${w.month}-${w.day}T12:00:00`);
+  const monday = new Date(`${w.year}-${String(w.month).padStart(2, "0")}-${String(w.day).padStart(2, "0")}T12:00:00`);
   monday.setDate(monday.getDate() + diffToMonday);
   return monday.toISOString().slice(0, 10);
 }
@@ -754,7 +754,7 @@ app.get("/api/dashboard", authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error("Dashboard error:", err);
-    res.status(500).json({ error: "Gagal memuat dashboard." });
+    res.status(500).json({ error: "Gagal memuat dashboard. Error: " + err.message + " Stack: " + err.stack });
   }
 });
 
