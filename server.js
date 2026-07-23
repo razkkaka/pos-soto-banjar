@@ -27,27 +27,52 @@ const VALID_EXPENSE_CATEGORIES = [
   "Lainnya",
 ];
 
-// All date math below intentionally uses UTC (matching SQLite's date('now'),
-// which is UTC) so that JS-computed boundaries (week/month) line up exactly
-// with dates stored via SQL's date('now') / datetime('now').
+// All date math uses Asia/Jakarta timezone (WIB = UTC+7) so that the daily
+// reset happens at midnight Jakarta time, not midnight UTC.
+function nowWIB() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false,
+  });
+  const parts = {};
+  formatter.formatToParts(new Date()).forEach(p => {
+    parts[p.type] = p.value;
+  });
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+    dayOfWeek: new Date(`${parts.year}-${parts.month}-${parts.day}T12:00:00`).getDay(),
+  };
+}
+
+function nowDatetimeStr() {
+  const w = nowWIB();
+  return `${w.year}-${String(w.month).padStart(2, "0")}-${String(w.day).padStart(2, "0")} ${String(w.hour).padStart(2, "0")}:${String(w.minute).padStart(2, "0")}:${String(w.second).padStart(2, "0")}`;
+}
+
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  const w = nowWIB();
+  return `${w.year}-${String(w.month).padStart(2, "0")}-${String(w.day).padStart(2, "0")}`;
 }
 
 function mondayOfThisWeekStr() {
-  const now = new Date();
-  const day = now.getUTCDay(); // 0 = Sunday ... 6 = Saturday
+  const w = nowWIB();
+  const day = w.dayOfWeek; // 0 = Sunday ... 6 = Saturday
   const diffToMonday = day === 0 ? -6 : 1 - day;
-  const monday = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-  );
-  monday.setUTCDate(monday.getUTCDate() + diffToMonday);
+  const monday = new Date(`${w.year}-${w.month}-${w.day}T12:00:00`);
+  monday.setDate(monday.getDate() + diffToMonday);
   return monday.toISOString().slice(0, 10);
 }
 
 function firstDayOfThisMonthStr() {
-  const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
+  const w = nowWIB();
+  return `${w.year}-${String(w.month).padStart(2, "0")}-01`;
 }
 
 app.use(cors());
