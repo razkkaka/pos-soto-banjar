@@ -151,6 +151,15 @@ const CREATE_TABLES_SQL = [
     note TEXT,
     updated_by TEXT,
     created_at TEXT DEFAULT (datetime('now'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS petty_cash_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    description TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    type TEXT NOT NULL DEFAULT 'usage',
+    usage_date TEXT NOT NULL,
+    created_by TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
   )`
 ];
 
@@ -289,6 +298,23 @@ function migrate() {
         amount INTEGER NOT NULL DEFAULT 0,
         note TEXT,
         updated_by TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+    `);
+  }
+
+  const pettyCashUsageTable = localQuery(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='petty_cash_usage'"
+  );
+  if (pettyCashUsageTable.length === 0) {
+    db.run(`
+      CREATE TABLE petty_cash_usage (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        description TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        type TEXT NOT NULL DEFAULT 'usage',
+        usage_date TEXT NOT NULL,
+        created_by TEXT,
         created_at TEXT DEFAULT (datetime('now'))
       );
     `);

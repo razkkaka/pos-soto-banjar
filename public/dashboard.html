@@ -48,11 +48,12 @@
           <p class="text-xs text-gray-400 mt-1">Kotor &minus; Pengeluaran</p>
         </div>
         <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-violet-500">
-          <p class="text-sm text-gray-500 mb-1">Petty Cash</p>
+          <p class="text-sm text-gray-500 mb-1">Petty Cash Awal</p>
           <div class="flex items-center gap-2">
             <p class="text-2xl font-bold text-violet-700" id="pettyCashAmount">Rp 0</p>
           </div>
-          <div class="mt-2">
+          <div class="mt-1 flex items-center justify-between">
+            <p class="text-xs text-gray-400">Sisa akhir: <span class="font-bold text-gray-700" id="pettyCashClosingInline">Rp 0</span></p>
             <button onclick="openPettyCashEdit()" class="text-xs text-violet-600 hover:text-violet-800 font-semibold underline transition">✏️ Ubah Nominal</button>
           </div>
         </div>
@@ -175,6 +176,51 @@
             </form>
 
             <div id="onlineIncomeList" class="divide-y divide-gray-100 max-h-72 overflow-y-auto"></div>
+          </div>
+
+          <!-- Petty Cash Management -->
+          <div class="bg-white rounded-2xl shadow overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100">
+              <h2 class="font-bold text-gray-800">💰 Petty Cash Hari Ini</h2>
+              <p class="text-xs text-gray-400 mt-0.5">Catat penggunaan kas kecil dan kembalian. Saldo akhir dihitung otomatis.</p>
+            </div>
+
+            <!-- Petty Cash Summary -->
+            <div class="px-5 py-3 bg-violet-50 border-b border-violet-100">
+              <div class="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <p class="text-xs text-gray-500">Kas Awal</p>
+                  <p class="text-sm font-bold text-violet-700" id="pcOpeningDisplay">Rp 0</p>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-500">Penggunaan</p>
+                  <p class="text-sm font-bold text-red-600" id="pcUsageDisplay">Rp 0</p>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-500">Kas Akhir</p>
+                  <p class="text-sm font-bold text-emerald-700" id="pcClosingDisplay">Rp 0</p>
+                </div>
+              </div>
+            </div>
+
+            <form id="pettyCashUsageForm" class="px-5 py-4 border-b border-gray-100 grid grid-cols-1 sm:grid-cols-4 gap-2">
+              <input type="text" id="pcUsageDesc" placeholder="Keterangan (mis. Bayar batu es)" required
+                class="sm:col-span-2 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none" />
+              <input type="number" id="pcUsageAmount" min="1" placeholder="Jumlah (Rp)" required
+                class="px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none" />
+              <select id="pcUsageType" required
+                class="px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none bg-white">
+                <option value="usage">Penggunaan</option>
+                <option value="return">Kembalian</option>
+              </select>
+              <button type="submit" id="pcUsageSubmitBtn"
+                class="sm:col-span-4 bg-violet-700 hover:bg-violet-800 text-white font-semibold py-2.5 rounded-lg text-sm transition">
+                + Tambah
+              </button>
+              <p id="pcUsageFormError" class="hidden sm:col-span-4 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2"></p>
+            </form>
+
+            <div id="pettyCashUsageList" class="divide-y divide-gray-100 max-h-60 overflow-y-auto"></div>
           </div>
 
         </div>
@@ -562,6 +608,37 @@
 
       // Payment breakdown — merged with online incomes
       renderPaymentBreakdown(dash.payment_breakdown_today, dash.online_income_items_today);
+
+      // Petty Cash
+      document.getElementById("pettyCashAmount").textContent = formatRupiah(dash.petty_cash);
+      document.getElementById("pettyCashClosingInline").textContent = formatRupiah(dash.petty_cash_closing);
+      document.getElementById("pcOpeningDisplay").textContent = formatRupiah(dash.petty_cash);
+      document.getElementById("pcUsageDisplay").textContent = formatRupiah(dash.petty_cash_total_usage - dash.petty_cash_total_return);
+      const pcClosingEl = document.getElementById("pcClosingDisplay");
+      pcClosingEl.textContent = formatRupiah(dash.petty_cash_closing);
+      pcClosingEl.className = "text-sm font-bold " + (dash.petty_cash_closing < 0 ? "text-red-600" : "text-emerald-700");
+
+      // Petty Cash Usage List
+      const pcListEl = document.getElementById("pettyCashUsageList");
+      if (!dash.petty_cash_usage_items || dash.petty_cash_usage_items.length === 0) {
+        pcListEl.innerHTML = `<p class="text-sm text-gray-400 text-center py-6">Belum ada penggunaan petty cash hari ini.</p>`;
+      } else {
+        pcListEl.innerHTML = dash.petty_cash_usage_items
+          .map(
+            (item) => `
+        <div class="flex items-center justify-between px-5 py-3">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-700 truncate">${item.description}</p>
+            <p class="text-xs text-gray-400">${item.type === "return" ? "Kembalian" : "Penggunaan"}</p>
+          </div>
+          <div class="flex items-center gap-3 flex-shrink-0">
+            <span class="text-sm font-semibold ${item.type === "return" ? "text-emerald-600" : "text-red-600"}">${item.type === "return" ? "+" : "-"} ${formatRupiah(item.amount)}</span>
+            <button onclick="deletePettyCashUsage(${item.id})" class="text-gray-400 hover:text-red-600 text-sm">✕</button>
+          </div>
+        </div>`
+          )
+          .join("");
+      }
     }
 
     // ==================== PAYMENT BREAKDOWN (merged with online incomes) ====================
@@ -1268,6 +1345,46 @@
       } finally {
         btn.disabled = false;
         btn.textContent = "Simpan";
+      }
+    }
+
+    // ==================== PETTY CASH USAGE ====================
+    document.getElementById("pettyCashUsageForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById("pcUsageFormError");
+      errEl.classList.add("hidden");
+
+      const description = document.getElementById("pcUsageDesc").value.trim();
+      const amount = Number(document.getElementById("pcUsageAmount").value);
+      const type = document.getElementById("pcUsageType").value;
+
+      const btn = document.getElementById("pcUsageSubmitBtn");
+      btn.disabled = true;
+      btn.textContent = "Menyimpan...";
+
+      try {
+        await apiFetch("/api/petty_cash/usage", {
+          method: "POST",
+          body: JSON.stringify({ description, amount, type }),
+        });
+        document.getElementById("pettyCashUsageForm").reset();
+        loadDashboard();
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove("hidden");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "+ Tambah";
+      }
+    });
+
+    async function deletePettyCashUsage(id) {
+      if (!confirm("Hapus data penggunaan petty cash ini?")) return;
+      try {
+        await apiFetch(`/api/petty_cash/usage/${id}`, { method: "DELETE" });
+        loadDashboard();
+      } catch (err) {
+        alert("Gagal menghapus: " + err.message);
       }
     }
 

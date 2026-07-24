@@ -643,6 +643,96 @@ app.post("/api/petty_cash", authMiddleware, async (req, res) => {
   }
 });
 
+// Petty Cash Today — get opening balance + all usage items + calculated closing balance
+app.get("/api/petty_cash/today", authMiddleware, async (req, res) => {
+  try {
+    const today = todayStr();
+
+    // Get latest petty cash opening balance
+    const pettyCashRows = await query(
+      "SELECT * FROM petty_cash ORDER BY created_at DESC LIMIT 1"
+    );
+    const openingBalance = pettyCashRows[0] ? pettyCashRows[0].amount : 0;
+
+    // Get today's usage items
+    const usageItems = await query(
+      "SELECT * FROM petty_cash_usage WHERE usage_date = ? ORDER BY created_at DESC",
+      [today]
+    );
+
+    // Calculate totals
+    let totalUsage = 0;
+    let totalReturn = 0;
+    usageItems.forEach((item) => {
+      if (item.type === "return") {
+        totalReturn += item.amount;
+      } else {
+        totalUsage += item.amount;
+      }
+    });
+
+    const closingBalance = openingBalance - totalUsage + totalReturn;
+
+    res.json({
+      date: today,
+      opening_balance: openingBalance,
+      usage_items: usageItems,
+      total_usage: totalUsage,
+      total_return: totalReturn,
+      closing_balance: closingBalance,
+    });
+  } catch (err) {
+    console.error("Petty cash today error:", err);
+    res.status(500).json({ error: "Gagal memuat data petty cash hari ini." });
+  }
+});
+
+// Add petty cash usage or return
+app.post("/api/petty_cash/usage", authMiddleware, async (req, res) => {
+  try {
+    const { description, amount, type } = req.body;
+
+    if (!description || !description.trim()) {
+      return res.status(400).json({ error: "Keterangan wajib diisi." });
+    }
+    if (amount === undefined || isNaN(amount) || Number(amount) <= 0) {
+      return res.status(400).json({ error: "Jumlah harus berupa angka lebih dari 0." });
+    }
+    if (!type || !["usage", "return"].includes(type)) {
+      return res.status(400).json({ error: "Tipe harus 'usage' atau 'return'." });
+    }
+
+    const today = todayStr();
+    const createdAt = nowDatetimeStr();
+    const id = await run(
+      `INSERT INTO petty_cash_usage (description, amount, type, usage_date, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [description.trim(), Math.round(Number(amount)), type, today, req.user.username, createdAt]
+    );
+
+    const savedRows = await query("SELECT * FROM petty_cash_usage WHERE id = ?", [id]);
+    res.status(201).json(savedRows[0]);
+  } catch (err) {
+    console.error("Petty cash usage error:", err);
+    res.status(500).json({ error: "Gagal menambah penggunaan petty cash." });
+  }
+});
+
+// Delete petty cash usage
+app.delete("/api/petty_cash/usage/:id", authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await query("SELECT * FROM petty_cash_usage WHERE id = ?", [id]);
+    if (!existing[0]) {
+      return res.status(404).json({ error: "Data penggunaan petty cash tidak ditemukan." });
+    }
+    await run("DELETE FROM petty_cash_usage WHERE id = ?", [id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Gagal menghapus penggunaan petty cash." });
+  }
+});
+
 // ---------- DASHBOARD ----------
 app.get("/api/dashboard", authMiddleware, async (req, res) => {
   try {
@@ -728,6 +818,22 @@ app.get("/api/dashboard", authMiddleware, async (req, res) => {
     );
     const pettyCashAmount = pettyCashRows[0] ? pettyCashRows[0].amount : 0;
 
+    // Petty Cash Usage (today)
+    const pettyCashUsageItems = await query(
+      "SELECT * FROM petty_cash_usage WHERE usage_date = ? ORDER BY created_at DESC",
+      [today]
+    );
+    let pettyCashTotalUsage = 0;
+    let pettyCashTotalReturn = 0;
+    pettyCashUsageItems.forEach((item) => {
+      if (item.type === "return") {
+        pettyCashTotalReturn += item.amount;
+      } else {
+        pettyCashTotalUsage += item.amount;
+      }
+    });
+    const pettyCashClosing = pettyCashAmount - pettyCashTotalUsage + pettyCashTotalReturn;
+
     res.json({
       gross_today: finalGrossToday,
       count_today: todayGrossRows[0].count,
@@ -737,6 +843,10 @@ app.get("/api/dashboard", authMiddleware, async (req, res) => {
       online_income_items_today: todayOnlineItems,
       net_today: dailyNet,
       petty_cash: pettyCashAmount,
+      petty_cash_usage_items: pettyCashUsageItems,
+      petty_cash_total_usage: pettyCashTotalUsage,
+      petty_cash_total_return: pettyCashTotalReturn,
+      petty_cash_closing: pettyCashClosing,
 
       gross_week: finalGrossWeek,
       count_week: weekGrossRows[0].count,

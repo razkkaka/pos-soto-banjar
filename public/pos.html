@@ -7,11 +7,14 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   @media print {
-    body * { visibility: hidden; }
-    #receiptPrintArea, #receiptPrintArea * { visibility: visible; }
+    body * { visibility: hidden; display: none; }
+    #receiptPrintArea, #receiptPrintArea * { visibility: visible !important; display: block !important; }
     #receiptPrintArea {
+      display: block !important;
       position: absolute; top: 0; left: 0; width: 100%;
     }
+    #receiptPrintArea .flex { display: flex !important; }
+    #receiptPrintArea .justify-between { justify-content: space-between; }
   }
   #receiptPrintArea { display: none; }
 </style>
